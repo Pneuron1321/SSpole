@@ -165,7 +165,7 @@ let dashOn = false, progOn = false, pttHeld = false, sticky = false;
 let st = {};                      // последнее состояние студии
 const geo = { lat: null, lon: null, spd: 0, head: null, trk: 0, acc: null,
               ok: false, last: null, log: [] };
-const tilt = { head: null, gamma: 0 };
+const tilt = { head: null, raw: null, gamma: 0 };
 const GPS_GOOD = 25, MOVING = 0.8;
 
 function msg(t, ms){
@@ -248,9 +248,17 @@ function geoStart(){
     if (c.heading != null && !isNaN(c.heading)) geo.head = c.heading;
   }, () => {}, { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 });
 }
+/* как в студии: угол берём безусловно — на Android обычное событие
+   приходит с absolute=false, и требовать иного значит остаться без курса */
+function wrap180(d){ return ((d + 540) % 360) - 180; }
 function tiltHandler(e){
-  if (e.webkitCompassHeading != null && !isNaN(e.webkitCompassHeading)) tilt.head = e.webkitCompassHeading;
-  else if (e.alpha != null && !isNaN(e.alpha) && e.absolute !== false) tilt.head = (360 - e.alpha) % 360;
+  let h = null;
+  if (e.webkitCompassHeading != null && !isNaN(e.webkitCompassHeading)) h = e.webkitCompassHeading;
+  else if (e.alpha != null && !isNaN(e.alpha)) h = (360 - e.alpha) % 360;
+  if (h != null){
+    tilt.raw = (tilt.raw == null) ? h : (tilt.raw + wrap180(h - tilt.raw) * 0.25 + 360) % 360;
+    tilt.head = tilt.raw;
+  }
   if (e.gamma != null) tilt.gamma = e.gamma;
 }
 async function tiltStart(){
