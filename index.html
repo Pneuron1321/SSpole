@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>ПОЛЕ · камера и пульт</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ПОЛЕ">
+<meta name="theme-color" content="#05070c">
+<!--
+  ПОЛЕ — лёгкая половина СКРИН-СТУДИИ.
+
+  Зачем отдельно. В поле телефон делает всего две вещи: отдаёт картинку со
+  звуком и служит пультом. Композит, кольцо клипов, карта, запись и Twitch
+  ему не нужны — а батарею и процессор они едят всерьёз. Здесь нет ни
+  одного лишнего кадра: своё видео показывается как есть, без полотна.
+
+  Что умеет:
+   · камера и микрофон → студии (та же связь, что у «Я — КАМЕРА»);
+   · GPS, компас и крен → приборам студии;
+   · слышит голос режиссёра, отдаёт рацию;
+   · показывает ПРОГРАММУ — что зрители видят прямо сейчас;
+   · пульт: эфир, запись, паника, блюр, клип, кольцо, микрофон, приборы;
+   · крупные индикаторы: связь, звук, батарея, эфир, гейт.
+
+  Экономия батареи: видео своё — обычный <video>, никакого canvas;
+  приборы считаются раз в секунду; кадры пульта приходят раз в секунду и
+  рисуются только когда открыта вкладка пульта.
+-->
+<style>
+  :root{
+    --bg:#05070c; --surface:#121A22; --ink:#E8E3D8; --dim:#7d8894;
+    --amber:#FFB454; --green:#7ED8A0; --red:#FF5D45; --sand:#E0CDA0;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
+    font-family:system-ui,-apple-system,'Segoe UI',sans-serif;overflow:hidden}
+  #cam{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
+  #cam.hidden{opacity:.001}
+
+  /* верхняя строка состояния — крупная, читается на солнце */
+  #top{position:absolute;left:0;right:0;top:0;z-index:5;display:flex;gap:6px;
+    align-items:center;padding:calc(env(safe-area-inset-top,0px) + 8px) 10px 8px;
+    background:linear-gradient(rgba(5,7,12,.85),rgba(5,7,12,0))}
+  .chip{padding:6px 10px;border-radius:999px;font-size:12px;font-weight:800;
+    background:rgba(18,26,34,.85);border:1px solid rgba(232,227,216,.18);
+    letter-spacing:.03em;white-space:nowrap}
+  .chip.ok{color:var(--green);border-color:rgba(126,216,160,.5)}
+  .chip.bad{color:var(--red);border-color:rgba(255,93,69,.5)}
+  .chip.live{color:#fff;background:var(--red);border:none}
+  .chip.warn{color:var(--amber);border-color:rgba(255,180,84,.5)}
+  #vu{flex:1;height:8px;border-radius:4px;background:rgba(18,26,34,.85);
+    overflow:hidden;border:1px solid rgba(232,227,216,.14)}
+  #vu i{display:block;height:100%;width:0%;background:var(--green)}
+
+  /* приборы: крупно и коротко */
+  #dash{position:absolute;left:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 116px);
+    z-index:5;display:none}
+  #spd{font:800 34px ui-monospace,Menlo,monospace;color:var(--amber);
+    text-shadow:0 2px 6px #000,0 0 2px #000;line-height:1}
+  #dashLine{font:700 13px ui-monospace,Menlo,monospace;color:var(--sand);
+    text-shadow:0 1px 4px #000;margin-top:4px}
+
+  /* программа: что видят зрители */
+  #prog{position:absolute;right:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 116px);
+    width:36%;max-width:210px;z-index:5;display:none}
+  #prog img{width:100%;border-radius:9px;border:1px solid rgba(255,180,84,.6);display:block}
+  #prog span{position:absolute;left:6px;top:4px;font:700 9px ui-monospace,Menlo,monospace;
+    color:var(--amber);text-shadow:0 1px 3px #000}
+
+  /* нижний пульт */
+  #keys{position:absolute;left:0;right:0;bottom:0;z-index:6;
+    padding:8px 8px calc(env(safe-area-inset-bottom,0px) + 8px);
+    display:flex;flex-wrap:wrap;gap:6px;
+    background:linear-gradient(rgba(5,7,12,0),rgba(5,7,12,.9) 30%)}
+  #keys button{flex:1 1 30%;min-width:96px;height:52px;border-radius:12px;
+    border:1px solid rgba(232,227,216,.2);background:rgba(18,26,34,.9);
+    color:var(--ink);font-size:12px;font-weight:800;letter-spacing:.02em}
+  #keys button.on{border-color:var(--amber);color:var(--amber);background:rgba(28,20,8,.9)}
+  #keys button.red.on{border-color:var(--red);color:#fff;background:var(--red)}
+  #keys button:active{transform:scale(.97)}
+  #ptt{flex:1 1 100%!important;height:64px!important;font-size:14px!important}
+  #ptt.hot{background:var(--green)!important;color:#04180d!important;border:none!important}
+
+  /* вход */
+  #enter{position:absolute;inset:0;z-index:20;display:flex;flex-direction:column;
+    justify-content:center;gap:10px;padding:24px;background:var(--bg)}
+  #enter h1{font-size:19px;margin:0 0 4px;color:var(--amber);letter-spacing:.04em}
+  #enter small{color:var(--dim);font-size:12px;line-height:1.5}
+  #enter input{height:48px;border-radius:11px;border:1px solid #333;background:var(--surface);
+    color:var(--ink);padding:0 14px;font-size:16px}
+  #enter button{height:52px;border-radius:12px;border:none;background:var(--amber);
+    color:#221500;font-size:15px;font-weight:800}
+  #enter button.quiet{background:var(--surface);color:var(--ink);border:1px solid #333}
+  .row{display:flex;gap:8px}
+  .row>*{flex:1}
+  #msg{position:absolute;left:50%;transform:translateX(-50%);z-index:30;
+    top:calc(env(safe-area-inset-top,0px) + 56px);max-width:92vw;
+    background:rgba(18,26,34,.95);border:1px solid rgba(255,180,84,.5);
+    border-radius:12px;padding:10px 14px;font-size:13px;display:none;text-align:center}
+</style>
+</head>
+<body>
+
+<video id="cam" playsinline webkit-playsinline autoplay muted></video>
+<audio id="dirAudio" autoplay playsinline></audio>
+
+<div id="top">
+  <div class="chip" id="cLink">нет связи</div>
+  <div class="chip" id="cGate">МИК</div>
+  <div id="vu"><i></i></div>
+  <div class="chip" id="cBat">—</div>
+</div>
+
+<div id="dash">
+  <div id="spd">—</div>
+  <div id="dashLine"></div>
+</div>
+
+<div id="prog"><img id="progImg" alt=""><span>ЭФИР</span></div>
+
+<div id="keys">
+  <button id="ptt">◉ РАЦИЯ — держи и говори</button>
+  <button class="red" id="kTwitch">▶ ЭФИР</button>
+  <button class="red" id="kPanic">ПАНИКА</button>
+  <button id="kClip">✂ КЛИП</button>
+  <button id="kRec">● ЗАПИСЬ</button>
+  <button id="kBlur">БЛЮР</button>
+  <button id="kDash">◎ ПРИБОРЫ</button>
+  <button id="kCam">⟲ КАМЕРА</button>
+  <button id="kProg">👁 ЭФИР?</button>
+  <button id="kOff">✕ ОТКЛЮЧИТЬСЯ</button>
+</div>
+
+<div id="msg"></div>
+
+<div id="enter">
+  <h1>ПОЛЕ · камера и пульт</h1>
+  <small>Телефон отдаёт картинку и звук студии, показывает приборы и служит
+  пультом. Студия должна быть запущена — дома на ноуте или на другом
+  телефоне.</small>
+  <input id="eName" maxlength="16" placeholder="как тебя звать в эфире">
+  <input id="eCode" maxlength="24" autocapitalize="characters" placeholder="код студии (4 буквы)">
+  <div class="row">
+    <input id="eRoom" maxlength="24" placeholder="…или комната">
+    <input id="ePass" maxlength="32" placeholder="пароль">
+  </div>
+  <button id="eGo">ВОЙТИ В ЭФИР</button>
+  <button class="quiet" id="eBack">камера сзади / спереди</button>
+  <small id="eNote"></small>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.5/peerjs.min.js"></script>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const LS = 'pole-mem';
+
+/* ---------- состояние ---------- */
+let peer = null, call = null, ctrl = null, stream = null, facing = 'environment';
+let target = '', myName = '', retry = 0, stopping = false;
+let dashOn = false, progOn = false, pttHeld = false, sticky = false;
+let st = {};                      // последнее состояние студии
+const geo = { lat: null, lon: null, spd: 0, head: null, trk: 0, acc: null,
+              ok: false, last: null, log: [] };
+const tilt = { head: null, gamma: 0 };
+const GPS_GOOD = 25, MOVING = 0.8;
+
+function msg(t, ms){
+  $('msg').textContent = t;
+  $('msg').style.display = 'block';
+  clearTimeout(msg.t);
+  msg.t = setTimeout(() => { $('msg').style.display = 'none'; }, ms || 4000);
+}
+function mem(){ try{ return JSON.parse(localStorage.getItem(LS) || '{}'); }catch(e){ return {}; } }
+function memSave(o){ try{ localStorage.setItem(LS, JSON.stringify(Object.assign(mem(), o))); }catch(e){} }
+
+/* ---------- камера и микрофон ---------- */
+async function openCam(){
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: facing, width: { ideal: 1920 }, height: { ideal: 1080 },
+             frameRate: { ideal: 30 } },
+    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+  });
+  $('cam').srcObject = stream;
+  $('cam').play().catch(() => {});
+  vuStart();
+  return stream;
+}
+/* гейт микрофона: режем саму дорожку — честно, как в студии */
+function gate(on){
+  if (!stream) return;
+  stream.getAudioTracks().forEach(t => { t.enabled = !on; });
+  $('cGate').textContent = on ? '⊘ МИК' : 'МИК';
+  $('cGate').className = 'chip' + (on ? ' bad' : ' ok');
+}
+let vuCtx = null, vuAn = null;
+function vuStart(){
+  try{
+    if (!vuCtx) vuCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (vuAn) vuAn.disconnect();
+    vuAn = vuCtx.createAnalyser(); vuAn.fftSize = 256;
+    vuCtx.createMediaStreamSource(new MediaStream(stream.getAudioTracks())).connect(vuAn);
+  }catch(e){}
+}
+setInterval(() => {
+  if (!vuAn) return;
+  const b = new Uint8Array(vuAn.fftSize);
+  vuAn.getByteTimeDomainData(b);
+  let s = 0;
+  for (let i = 0; i < b.length; i++){ const d = (b[i] - 128) / 128; s += d * d; }
+  const lvl = Math.min(100, Math.sqrt(s / b.length) * 320);
+  const bar = $('vu').firstElementChild;
+  bar.style.width = lvl + '%';
+  bar.style.background = lvl > 88 ? 'var(--red)' : 'var(--green)';
+}, 140);
+
+/* ---------- датчики ---------- */
+function median3(a){
+  if (!a.length) return 0;
+  const s = a.slice(-3).sort((x, y) => x - y);
+  return s[Math.floor(s.length / 2)];
+}
+function geoStart(){
+  if (geoStart.on || !navigator.geolocation) return;
+  geoStart.on = true;
+  navigator.geolocation.watchPosition(p => {
+    const c = p.coords;
+    geo.ok = true; geo.acc = c.accuracy;
+    if (geo.last && c.accuracy <= GPS_GOOD){
+      const R = 6371000, rad = Math.PI / 180;
+      const dLat = (c.latitude - geo.last.lat) * rad, dLon = (c.longitude - geo.last.lon) * rad;
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(c.latitude * rad) *
+                Math.cos(geo.last.lat * rad) * Math.sin(dLon / 2) ** 2;
+      const d = 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+      if (d > 3 && d < 500) geo.trk += d;
+    }
+    geo.last = { lat: c.latitude, lon: c.longitude };
+    geo.lat = c.latitude; geo.lon = c.longitude;
+    if (c.speed != null && c.speed >= 0 && c.accuracy <= GPS_GOOD){
+      geo.log.push(c.speed);
+      if (geo.log.length > 3) geo.log.shift();
+      geo.spd = median3(geo.log);
+    } else if (c.accuracy > GPS_GOOD * 2) geo.log.length = 0;
+    if (c.heading != null && !isNaN(c.heading)) geo.head = c.heading;
+  }, () => {}, { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 });
+}
+function tiltHandler(e){
+  if (e.webkitCompassHeading != null && !isNaN(e.webkitCompassHeading)) tilt.head = e.webkitCompassHeading;
+  else if (e.alpha != null && !isNaN(e.alpha) && e.absolute !== false) tilt.head = (360 - e.alpha) % 360;
+  if (e.gamma != null) tilt.gamma = e.gamma;
+}
+async function tiltStart(){
+  try{
+    const D = window.DeviceOrientationEvent;
+    if (D && typeof D.requestPermission === 'function'){
+      if (await D.requestPermission() !== 'granted') return;
+    }
+    window.addEventListener('deviceorientationabsolute', tiltHandler, true);
+    window.addEventListener('deviceorientation', tiltHandler, true);
+  }catch(e){}
+}
+/* показатели: цифра либо честная, либо её нет */
+function dashDraw(){
+  if (!dashOn) return;
+  const trustS = geo.ok && geo.acc != null && geo.acc <= GPS_GOOD;
+  const head = tilt.head != null ? tilt.head : geo.head;
+  const trustH = tilt.head != null || (trustS && geo.spd >= MOVING);
+  $('spd').textContent = trustS ? (geo.spd * 3.6).toFixed(1) : 'GPS';
+  $('spd').style.color = trustS ? 'var(--amber)' : 'var(--red)';
+  const bits = [];
+  if (trustS) bits.push('км/ч');
+  if (trustH) bits.push(Math.round(head) + '°');
+  if (geo.trk > 30) bits.push((geo.trk / 1000).toFixed(2) + ' км');
+  if (Math.abs(tilt.gamma) > 5) bits.push('крен ' + Math.abs(Math.round(tilt.gamma)) + '°');
+  $('dashLine').textContent = bits.join(' · ');
+}
+setInterval(dashDraw, 1000);
+
+/* ---------- связь со студией ---------- */
+async function roomId(name, pass){
+  if (!(window.crypto && crypto.subtle)) return null;
+  const raw = new TextEncoder().encode('skrin/' + String(name).trim().toLowerCase() + '/' + pass);
+  const buf = await crypto.subtle.digest('SHA-256', raw);
+  return 'r' + [...new Uint8Array(buf)].slice(0, 9).map(b => b.toString(36).padStart(2, '0')).join('');
+}
+function link(state, cls){
+  $('cLink').textContent = state;
+  $('cLink').className = 'chip' + (cls ? ' ' + cls : '');
+}
+const REDIAL = [2, 3, 5, 8, 13, 21, 30, 30];
+function redial(){
+  if (stopping) return;
+  if (retry >= REDIAL.length){ link('не дозвонился', 'bad'); msg('Студия не отвечает. Она запущена?', 8000); return; }
+  const w = REDIAL[retry++];
+  link('перезвон ' + w + 'с', 'warn');
+  try{ if (peer) peer.destroy(); }catch(e){}
+  peer = null; call = null; ctrl = null;
+  setTimeout(connect, w * 1000);
+}
+async function connect(){
+  if (stopping) return;
+  link('соединяюсь…', 'warn');
+  try{ if (peer) peer.destroy(); }catch(e){}
+  peer = new Peer({ debug: 0, config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] } });
+  peer.on('open', () => {
+    retry = 0;
+    /* видео и звук — студии */
+    call = peer.call(target, stream, { metadata: { name: myName } });
+    call.on('stream', s => {                     // голос режиссёра
+      $('dirAudio').srcObject = s;
+      $('dirAudio').play().catch(() => {});
+    });
+    call.on('close', () => { if (!stopping){ link('связь упала', 'bad'); redial(); } });
+    /* канал данных: программа, ориентация, показания, команды пульта */
+    ctrl = peer.connect(target, { metadata: { role: 'program', name: myName } });
+    ctrl.on('open', () => {
+      link('в эфире', 'ok');
+      msg('Связь есть. Экран не гаси — камера работает, пока страница открыта.', 6000);
+      sendOrient(); sendGeo();
+    });
+    ctrl.on('data', d => {
+      if (!d) return;
+      if (d.op === 'prog' && progOn){ $('progImg').src = d.jpg; }
+      if (d.op === 'pult-view' && d.st) paint(d.st);
+    });
+    ctrl.on('close', () => { if (!stopping) link('канал закрыт', 'warn'); });
+  });
+  peer.on('error', e => {
+    if (stopping) return;
+    if (['peer-unavailable', 'network', 'server-error', 'socket-error', 'socket-closed'].includes(e.type)){
+      link(e.type === 'peer-unavailable' ? 'студии нет' : 'сеть', 'bad');
+      redial();
+    } else link(e.type, 'bad');
+  });
+  peer.on('disconnected', () => { try{ peer.reconnect(); }catch(e){} });
+  keepAwake();
+}
+function send(o){
+  try{ if (ctrl && ctrl.open) ctrl.send(o); }catch(e){}
+}
+let beepCtx = null;
+/* тот же язык сигналов, что в студии: вверх — включилось, вниз — выключилось */
+function beep(kind){
+  try{
+    if (!beepCtx) beepCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (beepCtx.state === 'suspended') beepCtx.resume();
+    const t = beepCtx.currentTime, g = beepCtx.createGain(), o = beepCtx.createOscillator();
+    g.connect(beepCtx.destination); o.connect(g); o.type = 'sine';
+    const up = kind !== 'off';
+    o.frequency.setValueAtTime(up ? 520 : 760, t);
+    o.frequency.exponentialRampToValueAtTime(up ? 880 : 430, t + 0.12);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.16, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.17);
+    o.start(t); o.stop(t + 0.19);
+  }catch(e){}
+}
+function cmd(name, args){
+  if (!ctrl || !ctrl.open){ msg('нет связи со студией'); beep('off'); return; }
+  send({ op: 'cmd', name, args: args || [] });
+  beep(args && args[0] === false ? 'off' : 'on');
+  navigator.vibrate && navigator.vibrate(20);
+}
+function sendOrient(){
+  let a = 0;
+  try{ a = (screen.orientation && typeof screen.orientation.angle === 'number')
+           ? screen.orientation.angle : (window.orientation || 0); }catch(e){}
+  send({ op: 'orient', angle: a });
+}
+function sendGeo(){
+  if (geo.lat == null && tilt.head == null) return;
+  send({ op: 'geo', spd: geo.spd, head: tilt.head != null ? tilt.head : geo.head,
+         compass: tilt.head != null, tilt: Math.round(tilt.gamma),
+         lat: geo.lat, lon: geo.lon, acc: geo.acc, trk: geo.trk, t: Date.now() });
+}
+setInterval(sendGeo, 2000);
+setInterval(sendOrient, 15000);
+window.addEventListener('orientationchange', () => setTimeout(sendOrient, 350));
+
+/* ---------- кнопки состояния студии ---------- */
+function paint(s){
+  st = s || {};
+  const set = (id, on, cls) => {
+    const b = $(id);
+    b.classList.toggle('on', !!on);
+    if (cls) b.classList.toggle(cls, !!on);
+  };
+  set('kTwitch', st.twitch); set('kRec', st.rec); set('kPanic', st.panic);
+  set('kBlur', st.blur); set('kDash', st.dash);
+  $('cLink').textContent = st.twitch ? 'В ЭФИРЕ' : 'в эфире';
+  $('cLink').className = 'chip ' + (st.twitch ? 'live' : 'ok');
+}
+
+/* ---------- экран и батарея ---------- */
+let wake = null;
+async function keepAwake(){
+  try{ if (navigator.wakeLock && !wake) wake = await navigator.wakeLock.request('screen'); }catch(e){}
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  keepAwake();
+  $('cam').play().catch(() => {});
+  /* вернулись из фона: связь могла умереть тихо */
+  setTimeout(() => {
+    if (!stopping && target && (!call || !peer || peer.disconnected || peer.destroyed)){
+      link('возвращаюсь…', 'warn');
+      retry = 0; connect();
+    }
+  }, 700);
+});
+async function battery(){
+  try{
+    if (!navigator.getBattery) return;
+    const b = await navigator.getBattery();
+    const show = () => {
+      const p = Math.round(b.level * 100);
+      $('cBat').textContent = (b.charging ? '⚡' : '') + p + '%';
+      $('cBat').className = 'chip' + (p <= 20 && !b.charging ? ' bad' : (p <= 40 ? ' warn' : ''));
+    };
+    show();
+    b.addEventListener('levelchange', show);
+    b.addEventListener('chargingchange', show);
+  }catch(e){}
+}
+
+/* ---------- рация ---------- */
+function ptt(down){
+  pttHeld = down;
+  $('ptt').classList.toggle('hot', down);
+  send({ op: 'ptt', down });
+  if (down){ navigator.vibrate && navigator.vibrate(30); gate(false); }
+}
+$('ptt').addEventListener('pointerdown', e => { e.preventDefault(); ptt(true); });
+$('ptt').addEventListener('pointerup', () => ptt(false));
+$('ptt').addEventListener('pointercancel', () => ptt(false));
+
+/* ---------- кнопки ---------- */
+$('kTwitch').onclick = () => cmd('twitch');
+$('kRec').onclick = () => cmd('rec', [!st.rec]);
+$('kPanic').onclick = () => cmd('panic', [!st.panic]);
+$('kBlur').onclick = () => cmd('blur', [!st.blur]);
+$('kClip').onclick = () => { cmd('clip'); msg('клип режется'); };
+$('kDash').onclick = () => {
+  dashOn = !dashOn;
+  $('dash').style.display = dashOn ? 'block' : 'none';
+  $('kDash').classList.toggle('on', dashOn);
+  if (dashOn){ geoStart(); tiltStart(); dashDraw(); }
+};
+$('kCam').onclick = async () => {
+  facing = (facing === 'user') ? 'environment' : 'user';
+  memSave({ facing });
+  try{
+    await openCam();
+    const vt = stream.getVideoTracks()[0];
+    if (call && call.peerConnection){
+      const snd = call.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
+      if (snd) await snd.replaceTrack(vt);       // переключаем без разрыва связи
+    }
+    msg(facing === 'user' ? 'камера на себя' : 'камера от себя');
+  }catch(e){ msg('камера не открылась: ' + (e.name || e), 6000); }
+};
+$('kProg').onclick = () => {
+  progOn = !progOn;
+  $('prog').style.display = progOn ? 'block' : 'none';
+  $('kProg').classList.toggle('on', progOn);
+  $('cam').classList.toggle('hidden', false);
+};
+$('kOff').onclick = () => {
+  stopping = true;
+  try{ if (call) call.close(); }catch(e){}
+  try{ if (peer) peer.destroy(); }catch(e){}
+  link('отключено');
+  $('enter').style.display = 'flex';
+  stopping = false;
+};
+
+/* ---------- вход ---------- */
+$('eBack').onclick = () => {
+  facing = (facing === 'user') ? 'environment' : 'user';
+  memSave({ facing });
+  $('eNote').textContent = facing === 'user' ? 'камера: на себя' : 'камера: от себя';
+};
+$('eGo').onclick = async () => {
+  myName = ($('eName').value || '').trim();
+  if (myName.length < 2){ msg('впиши имя — по нему студия узнаёт тебя при возврате'); return; }
+  const rn = ($('eRoom').value || '').trim(), rp = $('ePass').value || '';
+  /* пароль комнаты не сохраняем — он ключ; для слепого входа годится код */
+  if (rn && rp){
+    const id = await roomId(rn, rp);
+    if (!id){ msg('комната с паролем требует https', 6000); return; }
+    target = id;
+  } else {
+    const code = ($('eCode').value || '').trim().toUpperCase();
+    if (code.length < 4){ msg('нужен код студии или комната с паролем'); return; }
+    target = code[0] === 'r' ? code : ('skrin-' + code);
+  }
+  memSave({ name: myName, code: ($('eCode').value || '').trim(), room: rn, facing,
+            pass: rp ? '1' : '', t: Date.now() });
+  try{ await openCam(); }
+  catch(e){ msg('камера не открылась: ' + (e.name || e), 8000); return; }
+  battery();
+  $('enter').style.display = 'none';
+  stopping = false; retry = 0;
+  connect();
+};
+
+/* ---------- старт ---------- */
+/* ---------- СЛЕПОЙ ВХОД ----------
+   Телефон с разбитым экраном ещё годится в дело: если он входил в эфир
+   меньше суток назад, войдёт сам — экран не нужен, достаточно открыть
+   страницу. Отменить можно касанием в любом месте за пять секунд. */
+function blindStart(){
+  const m = mem();
+  if (!m.name || !(m.code || m.room)) return false;
+  if (!m.t || Date.now() - m.t > 24 * 3600 * 1000) return false;
+  let left = 5, go = true;
+  const stop = () => { go = false; document.removeEventListener('pointerdown', stop); };
+  document.addEventListener('pointerdown', stop);
+  const tick = () => {
+    if (!go){ msg('автовход отменён — входи руками', 5000); return; }
+    if (left <= 0){
+      document.removeEventListener('pointerdown', stop);
+      msg('вхожу как ' + m.name, 3000);
+      $('eGo').onclick();
+      return;
+    }
+    msg('автовход через ' + left + ' с — коснись экрана, чтобы отменить', 1200);
+    left--;
+    setTimeout(tick, 1000);
+  };
+  setTimeout(tick, 600);
+  return true;
+}
+
+(function boot(){
+  const m = mem();
+  if (m.name) $('eName').value = m.name;
+  if (m.code) $('eCode').value = m.code;
+  if (m.room) $('eRoom').value = m.room;
+  if (m.facing) facing = m.facing;
+  $('eNote').textContent = facing === 'user' ? 'камера: на себя' : 'камера: от себя';
+  if (!(window.RTCPeerConnection && navigator.mediaDevices))
+    $('eNote').textContent = 'этот браузер не умеет видеосвязь — нужен Chrome или Safari';
+  else blindStart();
+})();
+</script>
+</body>
+</html>
