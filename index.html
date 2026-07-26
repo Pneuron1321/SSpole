@@ -130,7 +130,8 @@
   <button id="kBlur">БЛЮР</button>
   <button id="kDash">◎ ПРИБОРЫ</button>
   <button id="kCam">⟲ КАМЕРА</button>
-  <button id="kProg">👁 ЭФИР?</button>
+  <button id="kProg">👁 ЧТО В ЭФИРЕ</button>
+  <button id="kMont">⧉ МОНТАЖ</button>
   <button id="kOff">✕ ОТКЛЮЧИТЬСЯ</button>
 </div>
 
@@ -317,7 +318,9 @@ async function connect(){
   peer.on('open', () => {
     retry = 0;
     /* видео и звук — студии */
-    call = peer.call(target, stream, { metadata: { name: myName } });
+    /* имя обязательно и при перезвоне: по нему студия узнаёт своего
+       и не спрашивает разрешения заново */
+    call = peer.call(target, stream, { metadata: { name: myName || mem().name || '' } });
     call.on('stream', s => {                     // голос режиссёра
       $('dirAudio').srcObject = s;
       $('dirAudio').play().catch(() => {});
@@ -447,16 +450,27 @@ $('ptt').addEventListener('pointerup', () => ptt(false));
 $('ptt').addEventListener('pointercancel', () => ptt(false));
 
 /* ---------- кнопки ---------- */
-$('kTwitch').onclick = () => cmd('twitch');
+$('kTwitch').onclick = () => {
+  /* просим студию: она сама возьмёт сохранённый ключ и источник */
+  cmd('twitch', [!st.twitch]);
+  msg(st.twitch ? 'останавливаю эфир…' : 'запускаю эфир на студии…', 4000);
+};
 $('kRec').onclick = () => cmd('rec', [!st.rec]);
 $('kPanic').onclick = () => cmd('panic', [!st.panic]);
 $('kBlur').onclick = () => cmd('blur', [!st.blur]);
 $('kClip').onclick = () => { cmd('clip'); msg('клип режется'); };
-$('kDash').onclick = () => {
+$('kDash').onclick = async () => {
   dashOn = !dashOn;
   $('dash').style.display = dashOn ? 'block' : 'none';
   $('kDash').classList.toggle('on', dashOn);
-  if (dashOn){ geoStart(); tiltStart(); dashDraw(); }
+  beep(dashOn ? 'on' : 'off');
+  if (dashOn){
+    geoStart();
+    await tiltStart();                     // на iOS спросит разрешение
+    dashDraw();
+    msg(geo.ok ? 'приборы включены' : 'жду GPS — выйди под открытое небо', 5000);
+    send({ op: 'cmd', name: 'dash', args: [true] });
+  } else msg('приборы убраны', 2500);
 };
 $('kCam').onclick = async () => {
   facing = (facing === 'user') ? 'environment' : 'user';
@@ -475,7 +489,16 @@ $('kProg').onclick = () => {
   progOn = !progOn;
   $('prog').style.display = progOn ? 'block' : 'none';
   $('kProg').classList.toggle('on', progOn);
-  $('cam').classList.toggle('hidden', false);
+  beep(progOn ? 'on' : 'off');
+  msg(progOn ? 'вижу, что идёт зрителям' : 'окошко эфира убрано', 3000);
+};
+/* Монтаж из поля: просим студию открыть проекцию у себя. Двигать элементы
+   отсюда пока нельзя — для этого есть режим ПУЛЬТ в полной студии. */
+$('kMont').onclick = () => {
+  const on = !$('kMont').classList.contains('on');
+  $('kMont').classList.toggle('on', on);
+  cmd('montage', [on]);
+  msg(on ? 'открыл монтаж на студии' : 'закрыл монтаж', 3500);
 };
 $('kOff').onclick = () => {
   stopping = true;
