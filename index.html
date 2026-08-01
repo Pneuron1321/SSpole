@@ -22,7 +22,9 @@
    · GPS, компас и крен → приборам студии;
    · слышит голос режиссёра, отдаёт рацию;
    · показывает ПРОГРАММУ — что зрители видят прямо сейчас;
-   · пульт: эфир, запись, паника, блюр, клип, кольцо, микрофон, приборы;
+   · пульт: эфир, паника, блюр, микрофон, приборы, камера, монтаж;
+     клипа и записи здесь нет намеренно — видео-груз запрещён правилами
+     проекта, а решение резать и писать принимается на студии;
    · крупные индикаторы: связь, звук, батарея, эфир, гейт.
 
   Экономия батареи: видео своё — обычный <video>, никакого canvas;
@@ -69,6 +71,12 @@
   #prog img{width:100%;border-radius:9px;border:1px solid rgba(255,180,84,.6);display:block}
   #prog span{position:absolute;left:6px;top:4px;font:700 9px ui-monospace,Menlo,monospace;
     color:var(--amber);text-shadow:0 1px 3px #000}
+  #istok{display:flex;gap:4px;margin-top:5px}
+  #istok button{flex:1;height:30px;border-radius:8px;font-size:10px;font-weight:800;
+    border:1px solid rgba(232,227,216,.2);background:rgba(18,26,34,.9);color:var(--dim)}
+  #istok button.on{border-color:var(--amber);color:var(--amber);background:rgba(28,20,8,.9)}
+  #progWhy{display:none;padding:14px 10px;border-radius:9px;font-size:11px;line-height:1.45;
+    background:rgba(18,26,34,.95);border:1px dashed rgba(255,180,84,.5);color:var(--sand)}
 
   /* нижний пульт */
   #keys{position:absolute;left:0;right:0;bottom:0;z-index:6;
@@ -96,6 +104,51 @@
   #enter button.quiet{background:var(--surface);color:var(--ink);border:1px solid #333}
   .row{display:flex;gap:8px}
   .row>*{flex:1}
+  /* НАЛЕГКЕ: чёрный экран, живая только строка состояния. Тап возвращает
+     пульт на пять секунд (класс peek). */
+  /* visibility, а не opacity: прозрачный слой браузер всё равно
+     композитит, а скрытый — не рисует совсем. Поток в эфир идёт из
+     MediaStream и от показа на экране не зависит. */
+  body.lite #cam{visibility:hidden}
+  /* замок: экран не отвечает на касания вовсе */
+  body.locked #keys, body.locked #more, body.locked #prog{pointer-events:none;opacity:.35}
+  body.locked::before{content:'🔒';position:absolute;left:50%;top:50%;z-index:9;
+    transform:translate(-50%,-50%);font-size:34px;opacity:.25}
+  body.lite #keys, body.lite #dash, body.lite #prog, body.lite #more{display:none!important}
+  body.lite.peek #keys{display:flex!important}
+  body.lite #top{background:none}
+  body.lite::after{content:'НАЛЕГКЕ · слушаю';position:absolute;left:0;right:0;bottom:22px;
+    text-align:center;color:#2c3742;font:700 11px ui-monospace,Menlo,monospace;letter-spacing:.1em}
+  #mics{position:absolute;left:8px;right:8px;top:56px;z-index:9;display:none;
+    background:rgba(5,7,12,.97);border:1px solid rgba(232,227,216,.18);border-radius:16px;padding:12px}
+  #micsHead{display:flex;justify-content:space-between;align-items:center;
+    font:800 11px/1 system-ui;letter-spacing:.12em;color:var(--amber);margin-bottom:8px}
+  #micsX{cursor:pointer;padding:2px 8px;color:var(--dim)}
+  #micsBody button{display:block;width:100%;text-align:left;margin-bottom:5px;
+    padding:11px 12px;border-radius:10px;font-size:12px;
+    border:1px solid rgba(232,227,216,.16);background:rgba(18,26,34,.9);color:var(--ink)}
+  #micsBody button.on{border-color:var(--amber);color:var(--amber)}
+  #mics small{display:block;margin-top:8px;color:var(--dim);font-size:10px;line-height:1.45}
+  #help{position:absolute;left:8px;right:8px;top:56px;bottom:130px;z-index:8;display:none;
+    background:rgba(5,7,12,.97);border:1px solid rgba(232,227,216,.18);border-radius:16px;
+    padding:12px;overflow:auto;-webkit-overflow-scrolling:touch}
+  #helpHead{display:flex;justify-content:space-between;align-items:center;
+    font:800 11px/1 system-ui;letter-spacing:.12em;color:var(--amber);margin-bottom:8px}
+  #helpX{cursor:pointer;padding:2px 8px;color:var(--dim)}
+  #helpBody{margin:0;font:11px/1.55 ui-monospace,Menlo,monospace;color:var(--ink);white-space:pre-wrap}
+  #more{position:absolute;left:8px;right:8px;z-index:7;display:none;
+    bottom:calc(env(safe-area-inset-bottom,0px) + 128px);
+    background:rgba(5,7,12,.94);border:1px solid rgba(232,227,216,.16);
+    border-radius:16px;padding:10px}
+  #more small{display:block;margin-top:8px;color:var(--dim);font-size:10px;line-height:1.4}
+  .mgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+  .mgrid button{height:58px;border-radius:12px;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:3px;font-size:17px;
+    border:1px solid rgba(232,227,216,.18);background:rgba(18,26,34,.9);color:var(--ink)}
+  .mgrid button i{font-style:normal;font-size:9px;font-weight:700;color:var(--dim);
+    letter-spacing:.02em}
+  .mgrid button.on{border-color:var(--amber);background:rgba(28,20,8,.9)}
+  .mgrid button.on i{color:var(--amber)}
   #msg{position:absolute;left:50%;transform:translateX(-50%);z-index:30;
     top:calc(env(safe-area-inset-top,0px) + 56px);max-width:92vw;
     background:rgba(18,26,34,.95);border:1px solid rgba(255,180,84,.5);
@@ -110,6 +163,7 @@
 <div id="top">
   <div class="chip" id="cLink">нет связи</div>
   <div class="chip" id="cGate">МИК</div>
+  <div class="chip ok" id="cEar" style="display:none">👂</div>
   <div id="vu"><i></i></div>
   <div class="chip" id="cBat">—</div>
 </div>
@@ -119,20 +173,60 @@
   <div id="dashLine"></div>
 </div>
 
-<div id="prog"><img id="progImg" alt=""><span>ЭФИР</span></div>
+<div id="prog"><img id="progImg" alt=""><div id="progWhy"></div><span id="progTag">ЭФИР</span>
+  <div id="istok">
+    <button data-i="canvas">ЭХО</button><button data-i="camera">КАМ</button><button data-i="screen">ЭКРАН</button>
+  </div>
+</div>
 
 <div id="keys">
   <button id="ptt">◉ РАЦИЯ — держи и говори</button>
   <button class="red" id="kTwitch">▶ ЭФИР</button>
   <button class="red" id="kPanic">ПАНИКА</button>
-  <button id="kClip">✂ КЛИП</button>
-  <button id="kRec">● ЗАПИСЬ</button>
+  <button id="kMic">🎤 МИК</button>
+  <button id="kEar">👂 УХО</button>
   <button id="kBlur">БЛЮР</button>
   <button id="kDash">◎ ПРИБОРЫ</button>
   <button id="kCam">⟲ КАМЕРА</button>
+  <button id="kExt">🕶 ОЧКИ</button>
   <button id="kProg">👁 ЧТО В ЭФИРЕ</button>
   <button id="kMont">⧉ МОНТАЖ</button>
+  <button id="kMore">⋯ СТУДИЯ</button>
+  <button id="kHelp">🎙 КОМАНДЫ</button>
+  <button id="kLite">🪶 НАЛЕГКЕ</button>
+  <button id="kPocket">🔒 КАРМАН</button>
   <button id="kOff">✕ ОТКЛЮЧИТЬСЯ</button>
+</div>
+
+<div id="mics"><div id="micsHead">🎙 УСТРОЙСТВА ЭФИРА <span id="micsX">✕</span></div>
+<div id="micsBody"></div>
+<small>Ухо («рут код») слушает СИСТЕМНЫЙ микрофон — выбрать для него
+устройство браузер не даёт. Подключи очки гарнитурой, и они станут ухом,
+пока эфир идёт отсюда. На iOS гарнитура может утянуть в 8 кГц весь звук —
+проверь на слух после смены.</small></div>
+
+<div id="help"><div id="helpHead">🎙 ГОЛОСОВЫЕ КОМАНДЫ <span id="helpX">✕</span></div>
+<pre id="helpBody">спрашиваю у студии…</pre></div>
+
+<div id="more">
+  <div class="mgrid">
+    <button data-c="warm"     data-k="once">🔥<i>разогрев</i></button>
+    <button data-c="razbor"   data-k="once">📋<i>разбор</i></button>
+    <button data-c="cohost"   data-s="cohost">◆<i>соведущий</i></button>
+    <button data-c="duty"     data-s="duty">🤖<i>дежурный</i></button>
+    <button data-c="ear"      data-s="ear">👂<i>ухо студии</i></button>
+    <button data-c="subs"     data-s="subs">💬<i>субтитры</i></button>
+    <button data-c="map"      data-s="map" data-on="mini" data-off="off">🗺<i>карта</i></button>
+    <button data-c="prompter" data-s="prompterAloud">📖<i>суфлёр</i></button>
+    <button data-c="monitor"  data-s="monitor">🎧<i>наушники</i></button>
+    <button data-c="feedOn"   data-s="feedOn">📢<i>лента</i></button>
+    <button data-c="dash"     data-s="dash">◎<i>приборы</i></button>
+    <button data-c="probeNext" data-k="once">◈<i>чьи приборы</i></button>
+    <button data-c="pocket"   data-s="pocket">🔒<i>карман</i></button>
+    <button data-c="mark"     data-k="once">⚑<i>метка</i></button>
+  </div>
+  <small>Кнопки управляют СТУДИЕЙ на ноуте. Подсветка — её настоящее
+  состояние, а не то, что ты нажал.</small>
 </div>
 
 <div id="msg"></div>
@@ -178,19 +272,405 @@ function msg(t, ms){
 function mem(){ try{ return JSON.parse(localStorage.getItem(LS) || '{}'); }catch(e){ return {}; } }
 function memSave(o){ try{ localStorage.setItem(LS, JSON.stringify(Object.assign(mem(), o))); }catch(e){} }
 
+/* ---------- СЕТЬ: свой брокер и TURN (А6) ----------
+   Студия умеет ходить через СВОЙ peer-сервер и свой TURN — настройки
+   лежат в localStorage под ключом skrin-net. Поле их не читало и всегда
+   бежало к публичному брокеру: подними ты своё — половина круга осталась
+   бы на чужой табуретке, а TURN не включился бы там, где он и нужен, на
+   воде в чужой сети.
+   Ключ один и тот же, потому что поле и студия — один проект. На телефоне
+   его проще всего положить через строку адреса: #net=... (см. ниже) или
+   руками в консоли. */
+function loadNet(){
+  try{ return JSON.parse(localStorage.getItem('skrin-net') || '{}'); }catch(e){ return {}; }
+}
+let NET = loadNet();
+/* можно передать настройки ссылкой: pole.html#net={"host":"...","turnUri":"..."} */
+(function netFromHash(){
+  const m = String(location.hash || '').match(/net=([^&]+)/);
+  if (!m) return;
+  try{
+    const o = JSON.parse(decodeURIComponent(m[1]));
+    localStorage.setItem('skrin-net', JSON.stringify(o));
+    NET = o;
+  }catch(e){}
+})();
+function iceList(){
+  const ice = [{ urls: 'stun:stun.l.google.com:19302' }];
+  if (NET.turnUri){
+    const t = { urls: NET.turnUri };
+    if (NET.turnUser) t.username = NET.turnUser;
+    if (NET.turnPass) t.credential = NET.turnPass;
+    ice.push(t);
+  }
+  return ice;
+}
+function peerOpts(){
+  const o = { debug: 0, config: { iceServers: iceList() } };
+  if (NET.host){
+    o.host = NET.host;
+    o.port = NET.port ? +NET.port : 443;
+    o.path = NET.path || '/';
+    o.secure = (o.port === 443);
+    if (NET.key) o.key = NET.key;
+  }
+  return o;
+}
+
+/* ---------- ВНЕШНЯЯ КАМЕРА (очки Vanguard) ----------
+   Очки соединяются с ТЕЛЕФОНОМ, не с ноутом. Приложение-обёртка (Meta
+   Wearables Device Access Toolkit) открывает эту страницу в WebView и
+   отдаёт кадры сюда — а поле подменяет ими свою видеодорожку. Так телефон
+   держит ОДИН кодировщик и ОДИН поток: если бы очки шли в студию
+   отдельным участником, кодировщиков стало бы два, и в налегке телефон
+   этого не вынес бы.
+   ЗВУК ОСТАЁТСЯ С ТЕЛЕФОНА: микрофон очков идёт по HFP в 8 кГц и для
+   эфира непригоден — он годен только как канал команд Клоду.
+   Мост из приложения:
+     window.glassFrame(dataUrlИлиBitmap)  — кадр за кадром;
+     window.glassTrack(track)             — если приложение отдаёт дорожку.
+   Те же имена работают и в СТУДИИ: обёртке всё равно, какую из двух
+   страниц она открыла. */
+let extOn = false, extCv = null, extStream = null, extLast = 0;
+function extEnsure(){
+  if (!extCv){
+    extCv = document.createElement('canvas');
+    extCv.width = 1280; extCv.height = 720;
+  }
+  return extCv;
+}
+async function extUse(track){
+  /* подмена дорожки без разрыва связи — тем же путём, что смена камеры */
+  if (call && call.peerConnection){
+    const snd = call.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
+    if (snd) await snd.replaceTrack(track);
+  }
+  const vs = new MediaStream([track].concat(stream ? stream.getAudioTracks() : []));
+  $('cam').srcObject = vs;
+  extOn = true;
+  $('kExt').classList.add('on');
+  send({ op: 'shape', w: 1280, h: 720 });
+  msg('внешняя камера в эфире · звук с телефона', 4000);
+}
+window.glassFrame = function (src){
+  /* кадр из приложения: рисуем в холст, из него живёт дорожка */
+  const cv = extEnsure(), c = cv.getContext('2d');
+  const draw = img => {
+    c.drawImage(img, 0, 0, cv.width, cv.height);
+    extLast = Date.now();
+    if (!extStream){
+      extStream = cv.captureStream(24);
+      extUse(extStream.getVideoTracks()[0]);
+    }
+  };
+  if (typeof src === 'string'){
+    const im = new Image();
+    im.onload = () => draw(im);
+    im.src = src;
+  } else if (src) draw(src);
+};
+window.glassTrack = function (track){ if (track) extUse(track); };
+/* старые имена — синонимы, если обёртку начнут писать по первой заметке */
+window.poleFrame = (s) => window.glassFrame(s);
+window.poleExternal = (t) => window.glassTrack(t);
+async function extOff(){
+  extOn = false;
+  extStream = null;
+  $('kExt').classList.remove('on');
+  try{ await openCam(); }catch(e){}
+  const vt = stream && stream.getVideoTracks()[0];
+  if (vt && call && call.peerConnection){
+    const snd = call.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
+    if (snd) await snd.replaceTrack(vt);
+  }
+  msg('вернул камеру телефона', 3000);
+}
+
+/* ---------- НАЛЕГКЕ ----------
+   Режим для доски: руки заняты, до телефона не дотянуться, работает только
+   голос. Поэтому УХО ЗДЕСЬ НЕ ГАСНЕТ — наоборот, включается само: это
+   единственный способ говорить с Клодом на воде. Экономим всем остальным:
+   экран чёрный (камера при этом снимает и отдаёт эфир), кадры программы не
+   запрашиваются, VU не считается, приборы не рисуются — но GPS и компас
+   ПРОДОЛЖАЮТ уходить студии: это телеметрия для эфира, её видят зрители.
+   Экран не гасим системно: браузер остановил бы камеру. Держим включённым
+   и заливаем чёрным — на телефоне это заметная разница. */
+let lite = false, wakeLock = null;
+async function setLite(on){
+  lite = !!on;
+  document.body.classList.toggle('lite', lite);
+  $('kLite').classList.toggle('on', lite);
+  if (lite){
+    if (progOn) progShow(progKind, false);       // кадры прочь: и сеть, и разбор
+    $('more').style.display = 'none';
+    $('kMore').classList.remove('on');
+    if (!earOn){                                  // голос — единственная связь
+      earOn = true;
+      if (earStart()){ $('kEar').classList.add('on'); $('cEar').style.display = ''; }
+      else earOn = false;
+    }
+    try{
+      if (navigator.wakeLock && !wakeLock) wakeLock = await navigator.wakeLock.request('screen');
+    }catch(e){}
+    msg('НАЛЕГКЕ: экран погашен, слушаю «рут код». Тап — показать пульт', 6000);
+    beep('on');
+  } else {
+    try{ if (wakeLock){ await wakeLock.release(); wakeLock = null; } }catch(e){}
+    msg('обычный режим', 2500);
+    beep('off');
+  }
+  send({ op: 'lite', on: lite });                 // студия покажет режиссёру
+  return lite;
+}
+/* КАРМАН — отдельный замок, живёт сам по себе, а не внутри налегке.
+   Телефон едет в гермочехле, а то и в двух, в поясной сумке: экран там
+   жмётся сам собой. Замок глушит ВСЕ касания, включая долгое нажатие.
+   Снять — кнопкой (пока телефон в руках) или голосом «рут код, открой
+   карман»: голос проходит и через чехлы.
+   Wake lock — другое: он держит экран живым, чтобы браузер не остановил
+   камеру. Их не путать. */
+let pocketLock = false;
+function setPocketLock(on){
+  pocketLock = !!on;
+  $('kPocket').classList.toggle('on', pocketLock);
+  document.body.classList.toggle('locked', pocketLock);
+  send({ op: 'poleLock', on: pocketLock });
+  beep(pocketLock ? 'off' : 'on');
+  navigator.vibrate && navigator.vibrate(pocketLock ? [20, 60, 20] : 20);
+  msg(pocketLock ? 'КАРМАН: экран заперт. Снять — голосом «открой карман»'
+                 : 'карман открыт', 5000);
+  return pocketLock;
+}
+
+let litePeekT = null, liteHoldT = null;
+function litePeek(){
+  if (pocketLock) return;              // заперто — не будим ничем
+  document.body.classList.add('peek');
+  clearTimeout(litePeekT);
+  litePeekT = setTimeout(() => document.body.classList.remove('peek'), 5000);
+  beep('on');
+  navigator.vibrate && navigator.vibrate([15, 40, 15]);
+}
+function liteHoldStart(){
+  if (pocketLock) return;
+  clearTimeout(liteHoldT);
+  liteHoldT = setTimeout(litePeek, 700);   // долгое нажатие открывает пульт
+}
+function liteHoldStop(){ clearTimeout(liteHoldT); }
+
+/* ---------- УХО ПОЛЯ ----------
+   Телефон слышит «рут код …» и передаёт СТУДИИ текст — разбирает его она
+   своей таблицей. Своей таблицы у поля нет намеренно: две таблицы фраз
+   неминуемо разъедутся.
+   Выключено по умолчанию: распознавание держит микрофонный поток и
+   радио — на воде это заметная батарея. Режим НАЛЕГКЕ гасит его первым. */
+const EAR_WAKE = /(рут\s*код|root\s*code)/i;
+let earOn = false, rec = null, earWait = null;
+function earSay(t){ send({ op: 'earText', text: t }); }
+function earHeard(text){
+  const s = String(text || '').trim();
+  if (!s) return;
+  const m = s.match(EAR_WAKE);
+  if (m){
+    const tail = s.slice(s.indexOf(m[0]) + m[0].length).trim();
+    if (tail){ earSay(tail); msg('услышал: ' + tail, 3000); beep('on'); return; }
+    /* «рут код» сказан отдельно — ждём саму команду следующей фразой */
+    clearTimeout(earWait);
+    earWait = setTimeout(() => { earWait = null; }, 4000);
+    msg('слушаю команду…', 3500);
+    beep('on');
+    return;
+  }
+  if (earWait){                       // это и есть команда после «рут код»
+    clearTimeout(earWait); earWait = null;
+    earSay(s);
+    msg('услышал: ' + s, 3000);
+    beep('on');
+  }
+}
+function earStart(){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR){
+    msg('этот браузер не умеет слушать — ухо доступно на ноуте', 6000);
+    return false;
+  }
+  try{
+    rec = new SR();
+    rec.lang = 'ru-RU'; rec.continuous = true; rec.interimResults = false;
+    rec.onresult = e => {
+      for (let i = e.resultIndex; i < e.results.length; i++)
+        if (e.results[i].isFinal) earHeard(e.results[i][0].transcript);
+    };
+    rec.onerror = ev => {
+      if (ev.error === 'not-allowed'){ earStop(); msg('микрофон для распознавания не разрешён', 6000); }
+    };
+    rec.onend = () => { if (earOn) try{ rec.start(); }catch(e){} };   // держим живым
+    rec.start();
+    return true;
+  }catch(e){ msg('ухо не завелось: ' + (e.name || e), 5000); return false; }
+}
+function earStop(){
+  earOn = false;
+  try{ if (rec) rec.stop(); }catch(e){}
+  rec = null;
+  clearTimeout(earWait); earWait = null;
+  $('kEar').classList.remove('on');
+  $('cEar').style.display = 'none';
+}
+
 /* ---------- камера и микрофон ---------- */
 async function openCam(){
   if (stream) stream.getTracks().forEach(t => t.stop());
   stream = await navigator.mediaDevices.getUserMedia({
-    video: { facingMode: facing, width: { ideal: 1920 }, height: { ideal: 1080 },
-             frameRate: { ideal: 30 } },
-    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+    video: Object.assign(
+      { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } },
+      /* выбрана конкретная камера — идём по deviceId; иначе по стороне.
+         На телефоне сторон две, а на ноуте камер бывает три: встроенная,
+         USB и виртуальная. */
+      camDev ? { deviceId: { exact: camDev } } : { facingMode: facing }),
+    audio: Object.assign(
+      { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      micDev ? { deviceId: { exact: micDev } } : {})
   });
   $('cam').srcObject = stream;
   $('cam').play().catch(() => {});
+  poleGuard(stream);
   vuStart();
   return stream;
 }
+/* СТРАЖ КАМЕРЫ В ПОЛЕ. На телефоне дорожку убивает входящий звонок —
+   и раньше друг просто застывал у режиссёра в окне навсегда. Теперь поле
+   поднимает камеру само и ПОДМЕНЯЕТ дорожку в живом звонке, не разрывая
+   связь: тем же путём, что смена камеры и очки. */
+let guardTry = 0, guardT = null;
+function poleGuard(s){
+  if (!s) return;
+  s.getVideoTracks().forEach(t => { t.onended = () => poleLost(); });
+}
+async function poleLost(){
+  if (guardT || extOn) return;             // очки живут своей жизнью
+  msg('камера пропала — поднимаю', 4000);
+  const wait = [400, 1500, 4000][Math.min(guardTry, 2)];
+  guardTry++;
+  guardT = setTimeout(async () => {
+    guardT = null;
+    try{
+      await openCam();
+      const vt = stream && stream.getVideoTracks()[0];
+      if (vt && call && call.peerConnection){
+        const snd = call.peerConnection.getSenders().find(x => x.track && x.track.kind === 'video');
+        if (snd) await snd.replaceTrack(vt);   // связь не рвём
+      }
+      guardTry = 0;
+      msg('камера вернулась', 3000);
+      beep('on');
+    }catch(e){
+      if (guardTry < 3) poleLost();
+      else { msg('камера не вернулась — проверь, не занял ли её звонок', 8000); beep('off'); }
+    }
+  }, wait);
+}
+/* Кто главнее: мут или рация. Рация — «держи и говори», она обязана
+   пробивать выключенный микрофон, иначе быстрое слово теряется. Чистая
+   функция, чтобы прожиг проверял её без браузера. */
+function micMute(off, ptt){ return !!off && !ptt; }
+let micOff = false;
+/* ДВА МИКРОФОНА ПО ОТДЕЛЬНОСТИ.
+   Эфирный звук берётся с ВЫБРАННОГО устройства (телефон), а ухо слушает
+   СИСТЕМНЫЙ микрофон — тот, что назначен по умолчанию. Если очки
+   подключены гарнитурой и стали системными, получается ровно то, что
+   нужно: голос эфира с телефона, «рут код» через очки.
+   Честный предел: выбрать устройство для УХА нельзя — распознавание речи
+   в браузере не даёт такой ручки, оно всегда берёт системное. И второе:
+   на iOS активная Bluetooth-гарнитура умеет утащить ВСЮ звуковую сессию
+   в 8 кГц — тогда испортится и эфир. Это проверяется только живым
+   телефоном, поэтому сказано вслух, а не спрятано. */
+let camDev = '';                     // выбранная камера (deviceId)
+try{ camDev = localStorage.getItem('pole-cam') || ''; }catch(e){}
+let micDev = '';
+try{ micDev = localStorage.getItem('pole-mic') || ''; }catch(e){}
+async function micList(){
+  try{
+    const ds = await navigator.mediaDevices.enumerateDevices();
+    return ds.filter(d => d.kind === 'audioinput');
+  }catch(e){ return []; }
+}
+async function micPick(id){
+  micDev = id || '';
+  try{ localStorage.setItem('pole-mic', micDev); }catch(e){}
+  const был = stream;
+  try{
+    await openCam();
+    const at = stream && stream.getAudioTracks()[0];
+    if (at && call && call.peerConnection){
+      const snd = call.peerConnection.getSenders().find(s => s.track && s.track.kind === 'audio');
+      if (snd) await snd.replaceTrack(at);      // связь не рвём
+    }
+    micApply();
+    msg('микрофон эфира сменён', 3000);
+    beep('on');
+  }catch(e){
+    stream = был;
+    msg('это устройство не отдало звук — вернул прежний', 5000);
+    beep('off');
+  }
+  $('mics').style.display = 'none';
+}
+async function camPick(id){
+  camDev = id || '';
+  try{ localStorage.setItem('pole-cam', camDev); }catch(e){}
+  const был = stream;
+  try{
+    await openCam();
+    const vt = stream && stream.getVideoTracks()[0];
+    if (vt && call && call.peerConnection){
+      const snd = call.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
+      if (snd) await snd.replaceTrack(vt);
+    }
+    msg('камера сменена', 3000); beep('on');
+  }catch(e){
+    stream = был;
+    msg('эта камера не открылась — вернул прежнюю', 5000); beep('off');
+  }
+  $('mics').style.display = 'none';
+}
+async function micShow(){
+  const list = await micList();
+  const box = $('micsBody');
+  box.innerHTML = '';
+  const mk = (id, name, on) => {
+    const b = document.createElement('button');
+    b.className = on ? 'on' : '';
+    b.textContent = name;
+    b.onclick = () => micPick(id);
+    box.appendChild(b);
+  };
+  mk('', 'системный (по умолчанию)', !micDev);
+  list.forEach((d, i) => mk(d.deviceId, d.label || ('микрофон ' + (i + 1)), d.deviceId === micDev));
+  /* камеры — тем же списком: на ноуте их бывает больше, чем сторон */
+  let cams = [];
+  try{
+    cams = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
+  }catch(e){}
+  if (cams.length > 1){
+    const h = document.createElement('div');
+    h.textContent = 'КАМЕРА';
+    h.style.cssText = 'margin:10px 0 6px;font:800 10px/1 system-ui;letter-spacing:.12em;color:#8A94A3';
+    box.appendChild(h);
+    const mkc = (id, name, on) => {
+      const b = document.createElement('button');
+      b.className = on ? 'on' : '';
+      b.textContent = name;
+      b.onclick = () => camPick(id);
+      box.appendChild(b);
+    };
+    mkc('', 'по стороне (перед/зад)', !camDev);
+    cams.forEach((d, i) => mkc(d.deviceId, d.label || ('камера ' + (i + 1)), d.deviceId === camDev));
+  }
+  $('mics').style.display = 'block';
+}
+function micApply(){ gate(micMute(micOff, pttHeld)); }
+
 /* гейт микрофона: режем саму дорожку — честно, как в студии */
 function gate(on){
   if (!stream) return;
@@ -208,7 +688,7 @@ function vuStart(){
   }catch(e){}
 }
 setInterval(() => {
-  if (!vuAn) return;
+  if (!vuAn || lite) return;      // налегке: VU не считаем, его всё равно не видно
   const b = new Uint8Array(vuAn.fftSize);
   vuAn.getByteTimeDomainData(b);
   let s = 0;
@@ -274,7 +754,7 @@ async function tiltStart(){
 }
 /* показатели: цифра либо честная, либо её нет */
 function dashDraw(){
-  if (!dashOn) return;
+  if (!dashOn || lite) return;    // налегке: не рисуем; geo студии продолжает идти
   const trustS = geo.ok && geo.acc != null && geo.acc <= GPS_GOOD;
   const head = tilt.head != null ? tilt.head : geo.head;
   const trustH = tilt.head != null || (trustS && geo.spd >= MOVING);
@@ -285,6 +765,11 @@ function dashDraw(){
   if (trustH) bits.push(Math.round(head) + '°');
   if (geo.trk > 30) bits.push((geo.trk / 1000).toFixed(2) + ' км');
   if (Math.abs(tilt.gamma) > 5) bits.push('крен ' + Math.abs(Math.round(tilt.gamma)) + '°');
+  if (!bits.length){
+    /* пустая приборка выглядит как сломанная кнопка — говорим, чего ждём */
+    bits.push(geo.ok ? 'жду точный GPS' : 'жду GPS');
+    if (tilt.head == null) bits.push('компас не дал разрешения');
+  }
   $('dashLine').textContent = bits.join(' · ');
 }
 setInterval(dashDraw, 1000);
@@ -314,7 +799,7 @@ async function connect(){
   if (stopping) return;
   link('соединяюсь…', 'warn');
   try{ if (peer) peer.destroy(); }catch(e){}
-  peer = new Peer({ debug: 0, config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] } });
+  peer = new Peer(peerOpts());
   peer.on('open', () => {
     retry = 0;
     /* видео и звук — студии */
@@ -335,7 +820,30 @@ async function connect(){
     });
     ctrl.on('data', d => {
       if (!d) return;
-      if (d.op === 'prog' && progOn){ $('progImg').src = d.jpg; }
+      if (d.op === 'help' && d.text){
+        $('helpBody').textContent = d.text;
+        return;
+      }
+      if (d.op === 'cmd' && d.name === 'poleLock'){
+        setPocketLock(d.args && d.args[0] === false ? false : true);
+        return;
+      }
+      if (d.op === 'cmd' && d.name === 'lite'){
+        /* сказал голосом «налегке» — студия разобрала и вернула команду сюда */
+        setLite(d.args && d.args[0] === false ? false : true);
+        return;
+      }
+      if (d.op === 'prog' && progOn){
+        $('progImg').src = d.jpg;
+        $('progWhy').style.display = 'none';
+        $('progImg').style.display = 'block';
+      }
+      if (d.op === 'prog-none' && progOn){
+        /* пустое окно выглядит как поломка — говорим причину словами */
+        $('progWhy').textContent = d.why || 'студия молчит';
+        $('progWhy').style.display = 'block';
+        $('progImg').style.display = 'none';
+      }
       if (d.op === 'pult-view' && d.st) paint(d.st);
     });
     ctrl.on('close', () => { if (!stopping) link('канал закрыт', 'warn'); });
@@ -400,7 +908,13 @@ function paint(s){
     b.classList.toggle('on', !!on);
     if (cls) b.classList.toggle(cls, !!on);
   };
-  set('kTwitch', st.twitch); set('kRec', st.rec); set('kPanic', st.panic);
+  set('kTwitch', st.twitch); set('kPanic', st.panic);
+  if (st.istok) document.querySelectorAll('#istok button')
+    .forEach(b => b.classList.toggle('on', b.dataset.i === st.istok));
+  document.querySelectorAll('.mgrid button[data-s]').forEach(b => {
+    const v = st[b.dataset.s];
+    b.classList.toggle('on', b.dataset.on ? (v === b.dataset.on) : !!v);
+  });
   set('kBlur', st.blur); set('kDash', st.dash);
   $('cLink').textContent = st.twitch ? 'В ЭФИРЕ' : 'в эфире';
   $('cLink').className = 'chip ' + (st.twitch ? 'live' : 'ok');
@@ -442,6 +956,7 @@ async function battery(){
 function ptt(down){
   pttHeld = down;
   $('ptt').classList.toggle('hot', down);
+  micApply();                       // рация пробивает выключенный микрофон
   send({ op: 'ptt', down });
   if (down){ navigator.vibrate && navigator.vibrate(30); gate(false); }
 }
@@ -455,10 +970,92 @@ $('kTwitch').onclick = () => {
   cmd('twitch', [!st.twitch]);
   msg(st.twitch ? 'останавливаю эфир…' : 'запускаю эфир на студии…', 4000);
 };
-$('kRec').onclick = () => cmd('rec', [!st.rec]);
 $('kPanic').onclick = () => cmd('panic', [!st.panic]);
 $('kBlur').onclick = () => cmd('blur', [!st.blur]);
-$('kClip').onclick = () => { cmd('clip'); msg('клип режется'); };
+/* Пульт студии: двенадцать клавиш компактной сеткой. Дистанционно, потому
+   что до ноутбука с воды не дотянуться. Подсветка идёт от СОСТОЯНИЯ студии,
+   а не от нажатия: если команда не дошла, кнопка не соврёт. */
+$('kExt').onclick = () => {
+  if (extOn){ extOff(); return; }
+  if (!extStream){
+    msg('очки не подключены: нужна обёртка Meta Wearables на этом телефоне — '
+      + 'она откроет эту страницу и начнёт слать кадры', 7000);
+    beep('off');
+    return;
+  }
+  msg('жду кадры от очков…', 4000);
+};
+/* Список команд поле НЕ хранит: просит у студии, где живёт таблица фраз.
+   Одна таблица — один список, разойтись нечему. */
+$('kHelp').onclick = () => {
+  const on = $('help').style.display !== 'block';
+  $('help').style.display = on ? 'block' : 'none';
+  $('kHelp').classList.toggle('on', on);
+  if (on){
+    $('helpBody').textContent = 'спрашиваю у студии…';
+    send({ op: 'help' });
+    beep('on');
+  }
+};
+$('helpX').onclick = () => { $('help').style.display = 'none'; $('kHelp').classList.remove('on'); };
+$('kLite').onclick = () => setLite(!lite);
+$('kPocket').onclick = () => setPocketLock(!pocketLock);
+document.addEventListener('pointerdown', liteHoldStart);
+document.addEventListener('pointerup', liteHoldStop);
+document.addEventListener('pointercancel', liteHoldStop);
+$('kMore').onclick = () => {
+  const on = $('more').style.display !== 'block';
+  $('more').style.display = on ? 'block' : 'none';
+  $('kMore').classList.toggle('on', on);
+  beep(on ? 'on' : 'off');
+};
+document.querySelectorAll('.mgrid button').forEach(b => {
+  b.onclick = () => {
+    const c = b.dataset.c;
+    if (b.dataset.k === 'once'){
+      cmd(c, c === 'mark' ? ['метка из поля'] : []);
+      msg(c === 'razbor' ? 'прошу разбор эфира' : c === 'warm' ? 'прошу разогрев у Клода'
+        : (c === 'probeNext' ? 'переключаю, чьи приборы в кадре' : 'метка поставлена'), 3000);
+      return;
+    }
+    const cur = st[b.dataset.s];
+    const isOn = b.dataset.on ? (cur === b.dataset.on) : !!cur;
+    const next = b.dataset.on ? (isOn ? b.dataset.off : b.dataset.on) : !isOn;
+    cmd(c, [next]);
+  };
+});
+
+$('kEar').onclick = () => {
+  if (earOn){ earStop(); beep('off'); msg('ухо выключено — батарея целее', 3000); return; }
+  earOn = true;
+  if (!earStart()){ earOn = false; return; }
+  $('kEar').classList.add('on');
+  $('cEar').style.display = '';
+  beep('on');
+  navigator.vibrate && navigator.vibrate(20);
+  msg('слушаю «рут код …» — команду выполнит студия', 4000);
+};
+/* Долгое нажатие на МИК — выбор устройства. Кнопок в ряду и так много,
+   а жест на самой кнопке искать не надо. */
+let micHoldT = null;
+$('kMic').addEventListener('pointerdown', () => {
+  clearTimeout(micHoldT);
+  micHoldT = setTimeout(() => { micHoldT = 'done'; micShow(); }, 600);
+});
+$('kMic').addEventListener('pointerup', () => {
+  if (micHoldT === 'done'){ micHoldT = null; return; }
+  clearTimeout(micHoldT);
+});
+$('micsX').onclick = () => { $('mics').style.display = 'none'; };
+$('kMic').onclick = () => {
+  if (micHoldT === 'done'){ micHoldT = null; return; }   // это был выбор устройства
+  micOff = !micOff;
+  micApply();
+  $('kMic').classList.toggle('on', micOff);
+  beep(micOff ? 'off' : 'on');
+  navigator.vibrate && navigator.vibrate(20);
+  msg(micOff ? 'микрофон выключен — рация всё равно работает' : 'микрофон включён');
+};
 $('kDash').onclick = async () => {
   dashOn = !dashOn;
   $('dash').style.display = dashOn ? 'block' : 'none';
@@ -485,21 +1082,45 @@ $('kCam').onclick = async () => {
     msg(facing === 'user' ? 'камера на себя' : 'камера от себя');
   }catch(e){ msg('камера не открылась: ' + (e.name || e), 6000); }
 };
-$('kProg').onclick = () => {
-  progOn = !progOn;
-  $('prog').style.display = progOn ? 'block' : 'none';
-  $('kProg').classList.toggle('on', progOn);
-  beep(progOn ? 'on' : 'off');
-  msg(progOn ? 'вижу, что идёт зрителям' : 'окошко эфира убрано', 3000);
-};
-/* Монтаж из поля: просим студию открыть проекцию у себя. Двигать элементы
-   отсюда пока нельзя — для этого есть режим ПУЛЬТ в полной студии. */
-$('kMont').onclick = () => {
-  const on = !$('kMont').classList.contains('on');
-  $('kMont').classList.toggle('on', on);
-  cmd('montage', [on]);
-  msg(on ? 'открыл монтаж на студии' : 'закрыл монтаж', 3500);
-};
+/* Одно окно, два вида: ЭФИР — что видят зрители, МОНТАЖ — макет режиссёра
+   с ноута. Разом только один: два потока кадров в поле не нужны никогда.
+   Подписка: кадры идут ТОЛЬКО пока смотришь — закрыл, и студия перестала
+   их считать, а телефон разбирать. */
+let progKind = 'prog';
+function progShow(kind, on){
+  progOn = on;
+  progKind = kind;
+  $('prog').style.display = on ? 'block' : 'none';
+  $('kProg').classList.toggle('on', on && kind === 'prog');
+  $('kMont').classList.toggle('on', on && kind === 'mont');
+  $('progTag').textContent = kind === 'mont' ? 'МОНТАЖ' : 'ЭФИР';
+  beep(on ? 'on' : 'off');
+  navigator.vibrate && navigator.vibrate(20);
+  send({ op: on ? 'prog-on' : 'prog-off', kind });
+  if (on){
+    $('progWhy').textContent = 'жду кадр со студии…';
+    $('progWhy').style.display = 'block';
+    $('progImg').style.display = 'none';
+    msg(kind === 'mont' ? 'смотрю макет режиссёра с ноута' : 'вижу, что идёт зрителям', 3000);
+  } else msg('окно закрыто — кадры больше не шлются', 2500);
+}
+$('kProg').onclick = () => progShow('prog', !(progOn && progKind === 'prog'));
+/* Что ноут отправит в эфир: эхо-картинка (собранный кадр), его камера или
+   экран. Выбор здесь, потому что на воде до ноутбука не дотянуться. */
+document.querySelectorAll('#istok button').forEach(b => {
+  b.onclick = () => {
+    cmd('istok', [b.dataset.i]);
+    document.querySelectorAll('#istok button')
+      .forEach(x => x.classList.toggle('on', x === b));
+    msg(b.dataset.i === 'canvas' ? 'в эфир пойдёт собранный кадр студии'
+      : (b.dataset.i === 'camera' ? 'в эфир пойдёт камера ноутбука'
+                                  : 'в эфир пойдёт экран или вкладка ноутбука'), 3500);
+  };
+});
+/* Монтаж — теперь В РУКАХ: студия считает макет, не открывая его у себя,
+   и шлёт кадром в это же окно. Двигать элементы отсюда нельзя — для этого
+   есть режим ПУЛЬТ в полной студии. */
+$('kMont').onclick = () => progShow('mont', !(progOn && progKind === 'mont'));
 $('kOff').onclick = () => {
   stopping = true;
   try{ if (call) call.close(); }catch(e){}
