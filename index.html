@@ -36,6 +36,12 @@
     --bg:#05070c; --surface:#121A22; --ink:#E8E3D8; --dim:#7d8894;
     --amber:#FFB454; --green:#7ED8A0; --red:#FF5D45; --sand:#E0CDA0;
   }
+  /* КОРЕНЬ ВТОРОЙ БЕДЫ ДНЯ. Долгое нажатие выделяло подпись вместо
+     нажатия — и из режима НАЛЕГКЕ было не выйти, а карман не включить.
+     Палец на телефоне не должен выделять текст нигде, кроме полей ввода. */
+  *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
+    -webkit-tap-highlight-color:transparent}
+  input, textarea, [contenteditable]{-webkit-user-select:text;user-select:text}
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
     font-family:system-ui,-apple-system,'Segoe UI',sans-serif;overflow:hidden}
@@ -117,8 +123,18 @@
   body.lite #keys, body.lite #dash, body.lite #prog, body.lite #more{display:none!important}
   body.lite.peek #keys{display:flex!important}
   body.lite #top{background:none}
-  body.lite::after{content:'НАЛЕГКЕ · слушаю';position:absolute;left:0;right:0;bottom:22px;
-    text-align:center;color:#2c3742;font:700 11px ui-monospace,Menlo,monospace;letter-spacing:.1em}
+  body.lite::after{content:'НАЛЕГКЕ · долгое нажатие — пульт';position:absolute;
+    left:0;right:0;bottom:22px;text-align:center;color:#2c3742;
+    font:700 11px ui-monospace,Menlo,monospace;letter-spacing:.1em}
+  /* ВЫХОД ВСЕГДА НА ВИДУ. Полагаться на один жест нельзя: 02.08 Александр
+     не смог выйти из режима вовсе. Кнопка мелкая и тусклая — кадр не
+     портит, но она есть и ждёт. */
+  #liteOut{display:none;position:absolute;right:10px;z-index:10;
+    top:calc(env(safe-area-inset-top,0px) + 10px);
+    padding:9px 13px;border-radius:12px;font:800 11px system-ui;
+    background:rgba(18,26,34,.85);border:1px solid rgba(255,180,84,.45);
+    color:var(--amber)}
+  body.lite #liteOut{display:block}
   #mics{position:absolute;left:8px;right:8px;top:56px;z-index:9;display:none;
     background:rgba(5,7,12,.97);border:1px solid rgba(232,227,216,.18);border-radius:16px;padding:12px}
   #micsHead{display:flex;justify-content:space-between;align-items:center;
@@ -136,6 +152,15 @@
     font:800 11px/1 system-ui;letter-spacing:.12em;color:var(--amber);margin-bottom:8px}
   #helpX{cursor:pointer;padding:2px 8px;color:var(--dim)}
   #helpBody{margin:0;font:11px/1.55 ui-monospace,Menlo,monospace;color:var(--ink);white-space:pre-wrap}
+  /* ШТОРКА. Кнопки нужны редко, а кадр видно всегда — 02.08 Александр
+     попросил их убирать. Прячем панель, оставляя саму шторку: она мелкая
+     и всегда под большим пальцем внизу. */
+  #kShtor{position:absolute;right:10px;z-index:8;width:38px;height:38px;
+    border-radius:50%;font-size:15px;line-height:1;padding:0;
+    bottom:calc(env(safe-area-inset-bottom,0px) + 8px);
+    background:rgba(18,26,34,.82);border:1px solid rgba(232,227,216,.22);color:var(--dim)}
+  body.shtor #keys{display:none}
+  body.shtor #kShtor{color:var(--amber);border-color:rgba(255,180,84,.5)}
   #more{position:absolute;left:8px;right:8px;z-index:7;display:none;
     bottom:calc(env(safe-area-inset-bottom,0px) + 128px);
     background:rgba(5,7,12,.94);border:1px solid rgba(232,227,216,.16);
@@ -149,6 +174,18 @@
     letter-spacing:.02em}
   .mgrid button.on{border-color:var(--amber);background:rgba(28,20,8,.9)}
   .mgrid button.on i{color:var(--amber)}
+  /* Список камер со своими ручками звука: пульт обязан уметь каждого
+     по отдельности, а не только всех разом. */
+  #cams{margin-top:8px}
+  #cams .crow{display:flex;align-items:center;gap:5px;margin-bottom:4px}
+  #cams .cname{flex:1;font-size:11px;color:var(--ink);overflow:hidden;
+    white-space:nowrap;text-overflow:ellipsis}
+  #cams .crow.lost .cname{color:var(--dim);font-style:italic}
+  #cams button{width:40px;height:30px;border-radius:9px;font-size:13px;padding:0;
+    border:1px solid rgba(232,227,216,.18);background:rgba(18,26,34,.9);color:var(--dim)}
+  #cams button.on{border-color:var(--amber);color:var(--amber)}
+  #cams .chead{font:800 9px/1 system-ui;letter-spacing:.12em;color:var(--dim);
+    margin:8px 0 5px}
   #msg{position:absolute;left:50%;transform:translateX(-50%);z-index:30;
     top:calc(env(safe-area-inset-top,0px) + 56px);max-width:92vw;
     background:rgba(18,26,34,.95);border:1px solid rgba(255,180,84,.5);
@@ -179,12 +216,16 @@
   </div>
 </div>
 
+<button id="kShtor" title="скрыть кнопки">▾</button>
+
 <div id="keys">
   <button id="ptt">◉ РАЦИЯ — держи и говори</button>
   <button class="red" id="kTwitch">▶ ЭФИР</button>
   <button class="red" id="kPanic">ПАНИКА</button>
   <button id="kMic">🎤 МИК</button>
   <button id="kEar">👂 УХО</button>
+  <button id="kUxo">🔇 ЧУЖОЙ ЗВУК</button>
+  <button id="kWake">🔧 НАСТРОИТЬ СЛОВО</button>
   <button id="kBlur">БЛЮР</button>
   <button id="kDash">◎ ПРИБОРЫ</button>
   <button id="kCam">⟲ КАМЕРА</button>
@@ -197,6 +238,8 @@
   <button id="kPocket">🔒 КАРМАН</button>
   <button id="kOff">✕ ОТКЛЮЧИТЬСЯ</button>
 </div>
+
+<button id="liteOut">✕ НАЛЕГКЕ</button>
 
 <div id="mics"><div id="micsHead">🎙 УСТРОЙСТВА ЭФИРА <span id="micsX">✕</span></div>
 <div id="micsBody"></div>
@@ -224,7 +267,18 @@
     <button data-c="probeNext" data-k="once">◈<i>чьи приборы</i></button>
     <button data-c="pocket"   data-s="pocket">🔒<i>карман</i></button>
     <button data-c="mark"     data-k="once">⚑<i>метка</i></button>
+    <button data-c="hunt"     data-s="hunt">⚡<i>ловец</i></button>
+    <button data-c="micGate"  data-s="mic">🎙<i>мик студии</i></button>
+    <button data-c="camMute"  data-s="camMuted">⊘<i>камера</i></button>
+    <button data-c="udar"     data-k="once">💥<i>удар</i></button>
+    <button data-c="tip"      data-s="tip">💛<i>донат</i></button>
+    <button data-c="zachet"   data-k="once">✓<i>зачёт</i></button>
+    <button data-c="pamyat"   data-s="pamyat" data-on="efir" data-off="off">🧠<i>память</i></button>
+    <button data-c="naedine"  data-s="naedine">🔒<i>наедине</i></button>
+    <button data-c="beseda"   data-k="once">💬<i>беседа</i></button>
+    <button data-c="frame"    data-k="once">📷<i>кадр клоду</i></button>
   </div>
+  <div id="cams"></div>
   <small>Кнопки управляют СТУДИЕЙ на ноуте. Подсветка — её настоящее
   состояние, а не то, что ты нажал.</small>
 </div>
@@ -464,13 +518,53 @@ function liteHoldStop(){ clearTimeout(liteHoldT); }
    неминуемо разъедутся.
    Выключено по умолчанию: распознавание держит микрофонный поток и
    радио — на воде это заметная батарея. Режим НАЛЕГКЕ гасит его первым. */
-const EAR_WAKE = /(рут\s*код|root\s*code)/i;
+/* Слово-триггер — общий с студией (см. её паспорт). Поле берёт выученные
+   варианты из той же памяти браузера: страницы живут на одном адресе,
+   значит калибровка, сделанная в студии, работает и здесь. */
+const WAKE_BASE = ['терминал плюс', 'плюс плюс', 'терминал'];
+let WAKE_LEARNED = [];
+try{ WAKE_LEARNED = JSON.parse(localStorage.getItem('skrin-wake') || '[]'); }catch(e){}
+/* звуковой скелет: б=п, д=т, г=к, в=ф, ж=ш, з/с/ц=с, о=а, и=ы, мягкий знак прочь */
+function wakeSkel(s){
+  return String(s || '').toLowerCase().replace(/ё/g, 'е')
+    .replace(/[^а-яa-z]/g, '')
+    .replace(/[бп]/g, 'п').replace(/[дт]/g, 'т').replace(/[гк]/g, 'к')
+    .replace(/[вф]/g, 'ф').replace(/[жш]/g, 'ш').replace(/[зсц]/g, 'с')
+    .replace(/[оа]/g, 'а').replace(/[иы]/g, 'и').replace(/[ьъ]/g, '');
+}
+/* Скелеты ЦЕЛЫХ фраз, без пробелов, с отброшенным окончанием. Целых —
+   принципиально: сравнивай по словам, и одинокое «плюс» в обычной речи
+   включало бы пульт. «Плюс плюс» же произносится только нарочно. */
+const WAKE_SKEL = () => WAKE_BASE.concat(WAKE_LEARNED)
+  .map(wakeSkel).filter(s => s.length >= 6)
+  .map(s => s.slice(0, s.length - 1));
+function wakeRe(){
+  const esc = w => String(w).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s*');
+  const parts = WAKE_BASE.concat(WAKE_LEARNED).map(esc).filter(Boolean);
+  parts.push('термина[лв]\\w*');                  // терминал · термина · терминалы
+  parts.push('[пб]лю[сзцш]\\s*[пб]лю[сзцш]');     // плюс-плюс и его подмены
+  return new RegExp('(' + parts.join('|') + ')', 'i');
+}
+let EAR_WAKE = wakeRe();
+/* Скелет ловит то, чего нет ни в одном списке: слово могло исказиться
+   впервые. Короткие обрывки отсекаем — на них легко сработать зря. */
+function wakeHeard(text){
+  if (EAR_WAKE.test(text)) return true;
+  const heard = wakeSkel(text);
+  if (heard.length < 6) return false;
+  return WAKE_SKEL().some(k => heard.indexOf(k) >= 0);
+}
 let earOn = false, rec = null, earWait = null;
 function earSay(t){ send({ op: 'earText', text: t }); }
 function earHeard(text){
   const s = String(text || '').trim();
   if (!s) return;
-  const m = s.match(EAR_WAKE);
+  if (wakeUchu){                       // калибровка: копим, что услышали
+    if (wakeLearnPole(s)){ msg('записал: ' + s, 2500); beep('on'); }
+    return;
+  }
+  const m = s.match(EAR_WAKE) ||
+            (wakeHeard(s) ? [s.split(/\s+/)[0]] : null);
   if (m){
     const tail = s.slice(s.indexOf(m[0]) + m[0].length).trim();
     if (tail){ earSay(tail); msg('услышал: ' + tail, 3000); beep('on'); return; }
@@ -534,6 +628,18 @@ async function openCam(){
   });
   $('cam').srcObject = stream;
   $('cam').play().catch(() => {});
+  /* Форму кадра надо СКАЗАТЬ. 02.08 камера поля приезжала на ноут в
+     квадратном окне: студия не знала пропорций и брала квадрат по
+     умолчанию. Дорожка сообщает их сама, как только откроется. */
+  try{
+    const t = stream.getVideoTracks()[0];
+    const s = t && t.getSettings ? t.getSettings() : null;
+    if (s && s.width && s.height) send({ op: 'shape', w: s.width, h: s.height });
+    else if (t) t.addEventListener('unmute', () => {
+      const g = t.getSettings ? t.getSettings() : null;
+      if (g && g.width) send({ op: 'shape', w: g.width, h: g.height });
+    }, { once: true });
+  }catch(e){}
   poleGuard(stream);
   vuStart();
   return stream;
@@ -808,6 +914,7 @@ async function connect(){
     call = peer.call(target, stream, { metadata: { name: myName || mem().name || '' } });
     call.on('stream', s => {                     // голос режиссёра
       $('dirAudio').srcObject = s;
+      $('dirAudio').muted = uxoOff;              // помним, что было выключено
       $('dirAudio').play().catch(() => {});
     });
     call.on('close', () => { if (!stopping){ link('связь упала', 'bad'); redial(); } });
@@ -915,6 +1022,8 @@ function paint(s){
     const v = st[b.dataset.s];
     b.classList.toggle('on', b.dataset.on ? (v === b.dataset.on) : !!v);
   });
+  if (st.hero !== undefined && st.hero !== heroNow){ heroNow = st.hero; camsWas = ''; }
+  camsPaint(st.camList);
   set('kBlur', st.blur); set('kDash', st.dash);
   $('cLink').textContent = st.twitch ? 'В ЭФИРЕ' : 'в эфире';
   $('cLink').className = 'chip ' + (st.twitch ? 'live' : 'ok');
@@ -998,7 +1107,114 @@ $('kHelp').onclick = () => {
   }
 };
 $('helpX').onclick = () => { $('help').style.display = 'none'; $('kHelp').classList.remove('on'); };
+/* ГЛУШИТЕЛЬ ЧУЖОГО ЗВУКА. 02.08: из поля нельзя было заткнуть голос,
+   идущий с ноутбука и от других камер. На воде это важнее, чем кажется:
+   чужой звук в наушнике мешает слышать ветер и волну. Свой микрофон и
+   рация при этом продолжают работать — глушим только ПРИЁМ. */
+let uxoOff = false;
+$('kUxo').onclick = () => {
+  uxoOff = !uxoOff;
+  $('dirAudio').muted = uxoOff;
+  $('kUxo').classList.toggle('on', uxoOff);
+  beep(uxoOff ? 'off' : 'on');
+  navigator.vibrate && navigator.vibrate(20);
+  msg(uxoOff ? 'чужой звук выключен — свой микрофон и рация работают'
+             : 'слышу студию', 3500);
+};
+/* ЗВУК КАЖДОЙ КАМЕРЫ ОТДЕЛЬНО. Кнопка 🔇 ЧУЖОЙ ЗВУК глушит то, что слышу
+   Я; здесь — то, что слышат ЗРИТЕЛИ и режиссёр, покамерно. 🔊 — в эфир,
+   🎧 — в наушники режиссёра. Ровно те же ручки, что на окне камеры в
+   студии, только дистанционно. */
+let camsWas = '', heroNow = '';
+function camsPaint(list){
+  if (!Array.isArray(list)) return;
+  const key = JSON.stringify(list);
+  if (key === camsWas) return;              // не перерисовываем зря
+  camsWas = key;
+  const box = $('cams');
+  box.innerHTML = '';
+  /* Своя камера студии — тоже участник: её тоже надо уметь вывести на
+     весь кадр. В студии она зовётся «я». */
+  list = [{ name: 'студия', hero: 'я', studio: true }].concat(
+    list.map(c => Object.assign({ hero: c.name }, c)));
+  const h = document.createElement('div');
+  h.className = 'chead';
+  h.textContent = 'КАМЕРЫ · ★ главная · 🔊 эфир · 🎧 режиссёру';
+  box.appendChild(h);
+  list.forEach(c => {
+    const row = document.createElement('div');
+    row.className = 'crow' + (c.lost ? ' lost' : '');
+    const nm = document.createElement('div');
+    nm.className = 'cname';
+    nm.textContent = c.name + (c.lost ? ' · нет связи' : '');
+    row.appendChild(nm);
+    /* ★ ГЛАВНАЯ КАМЕРА. 02.08: из пульта нельзя было вывести на весь кадр
+       ни одну камеру, в том числе свою. Звезда живёт здесь же — там, где
+       уже перечислены все камеры, а не отдельным меню. */
+    const star = document.createElement('button');
+    star.textContent = '★';
+    star.className = (heroNow === c.hero) ? 'on' : '';
+    star.onclick = () => {
+      const want = (heroNow === c.hero) ? '' : c.hero;
+      cmd('hero', [want]);
+      heroNow = want;
+      camsWas = '';                          // перерисовать список сразу
+      msg(want ? ('главная камера: ' + want) : 'главная камера снята', 3000);
+    };
+    row.appendChild(star);
+    /* у своей камеры студии ручек ЧУЖОГО звука нет: её микрофон у
+       режиссёра управляется гейтом, а не этими кнопками */
+    (c.studio ? [] : [['efir', '🔊', c.efir], ['ear', '🎧', c.ear]])
+      .forEach(([which, znak, on]) => {
+        const b = document.createElement('button');
+        b.textContent = znak;
+        b.className = on ? 'on' : '';
+        b.onclick = () => {
+          cmd('camAudio', [c.name, which, !on]);
+          b.classList.toggle('on', !on);     // отклик сразу, правду принесёт состояние
+        };
+        row.appendChild(b);
+      });
+    box.appendChild(row);
+  });
+}
+/* КАЛИБРОВКА СЛОВА В ПОЛЕ. У поля своё ухо и свой микрофон: слово,
+   настроенное на ноуте, здесь может слышаться иначе. Тридцать секунд
+   пишем, что услышали, и добавляем в общий список. */
+let wakeUchu = false, wakeUchuT = null;
+function wakeLearnPole(t){
+  const s = String(t || '').trim().toLowerCase();
+  if (!s || s.split(/\s+/).length > 3 || s.length > 24) return false;
+  if (WAKE_LEARNED.indexOf(s) >= 0) return false;
+  WAKE_LEARNED.push(s);
+  if (WAKE_LEARNED.length > 24) WAKE_LEARNED.shift();
+  try{ localStorage.setItem('skrin-wake', JSON.stringify(WAKE_LEARNED)); }catch(e){}
+  EAR_WAKE = wakeRe();
+  return true;
+}
+$('kWake').onclick = () => {
+  wakeUchu = !wakeUchu;
+  clearTimeout(wakeUchuT);
+  $('kWake').classList.toggle('on', wakeUchu);
+  if (wakeUchu){
+    if (!earOn){ earOn = true; if (earStart()){ $('kEar').classList.add('on'); $('cEar').style.display = ''; } else earOn = false; }
+    wakeUchuT = setTimeout(() => $('kWake').click(), 30000);
+    msg('30 секунд говори «терминал плюс» или «плюс плюс» с паузами — запишу, как слышится', 7000);
+    beep('on');
+  } else {
+    msg('слово настроено · вариантов: ' + WAKE_LEARNED.length, 5000);
+    beep('off');
+  }
+};
+$('kShtor').onclick = () => {
+  const on = !document.body.classList.contains('shtor');
+  document.body.classList.toggle('shtor', on);
+  $('kShtor').textContent = on ? '▴' : '▾';
+  beep(on ? 'off' : 'on');
+  if (on) msg('кнопки убраны — шторка внизу справа', 3000);
+};
 $('kLite').onclick = () => setLite(!lite);
+$('liteOut').onclick = e => { e.stopPropagation(); setLite(false); };
 $('kPocket').onclick = () => setPocketLock(!pocketLock);
 document.addEventListener('pointerdown', liteHoldStart);
 document.addEventListener('pointerup', liteHoldStop);
@@ -1013,9 +1229,12 @@ document.querySelectorAll('.mgrid button').forEach(b => {
   b.onclick = () => {
     const c = b.dataset.c;
     if (b.dataset.k === 'once'){
-      cmd(c, c === 'mark' ? ['метка из поля'] : []);
-      msg(c === 'razbor' ? 'прошу разбор эфира' : c === 'warm' ? 'прошу разогрев у Клода'
-        : (c === 'probeNext' ? 'переключаю, чьи приборы в кадре' : 'метка поставлена'), 3000);
+      const ARG = { mark: ['метка из поля'], udar: [1], zachet: [''], beseda: [true] };
+      cmd(c, ARG[c] || []);
+      msg({ razbor: 'прошу разбор эфира', warm: 'прошу разогрев у Клода',
+            probeNext: 'переключаю, чьи приборы в кадре', udar: 'удар в эфир',
+            zachet: 'зачёт последнему совету', beseda: 'зову собеседника',
+            frame: 'кадр ушёл Клоду', mark: 'метка поставлена' }[c] || 'сделано', 3000);
       return;
     }
     const cur = st[b.dataset.s];
@@ -1123,6 +1342,11 @@ document.querySelectorAll('#istok button').forEach(b => {
 $('kMont').onclick = () => progShow('mont', !(progOn && progKind === 'mont'));
 $('kOff').onclick = () => {
   stopping = true;
+  /* ПРОЩАНИЕ. Студия держит окно две минуты после обрыва — это правильно
+     для дрогнувшей связи: место и размер переживают тоннель. Но уход по
+     кнопке не обрыв, и замороженный кадр висел бы в эфире зря. Говорим
+     прямо: я ушёл, окно можно убрать. */
+  try{ if (ctrl && ctrl.open) ctrl.send({ op: 'bye' }); }catch(e){}
   try{ if (call) call.close(); }catch(e){}
   try{ if (peer) peer.destroy(); }catch(e){}
   link('отключено');
