@@ -120,6 +120,10 @@
   body.locked #keys, body.locked #more, body.locked #prog{pointer-events:none;opacity:.35}
   body.locked::before{content:'🔒';position:absolute;left:50%;top:50%;z-index:9;
     transform:translate(-50%,-50%);font-size:34px;opacity:.25}
+  /* подсказка жеста: тускло, но всегда на виду — иначе выход не найти */
+  body.locked::after{content:'нарисуй Г — вверх, потом вправо';position:absolute;
+    left:0;right:0;top:calc(50% + 34px);text-align:center;z-index:9;
+    color:#3a4654;font:700 11px system-ui;letter-spacing:.06em}
   body.lite #keys, body.lite #dash, body.lite #prog, body.lite #more{display:none!important}
   body.lite.peek #keys{display:flex!important}
   body.lite #top{background:none}
@@ -484,6 +488,37 @@ async function setLite(on){
    Wake lock — другое: он держит экран живым, чтобы браузер не остановил
    камеру. Их не путать. */
 let pocketLock = false;
+/* Г-ЖЕСТ — единственный выход из кармана пальцем.
+   Замок глушит все касания, и до сих пор снять его можно было только
+   голосом. Если ухо выключено или не слышит сквозь ветер и чехол —
+   телефон заперт наглухо. Нужен жест, который брызги и ткань не
+   нарисуют случайно: две длинные черты с одним прямым углом.
+   Пишется Г одним движением: ВВЕРХ, потом ВПРАВО.
+   Функция чистая — прожиг проверяет её без браузера. */
+function gLock(pts, w, h){
+  if (!pts || pts.length < 6) return false;
+  const A = pts[0], B = pts[pts.length - 1];
+  /* угол — самая дальняя точка от прямой начало→конец */
+  let corner = null, best = -1;
+  const dx = B.x - A.x, dy = B.y - A.y;
+  const len = Math.hypot(dx, dy) || 1;
+  for (const P of pts){
+    const d = Math.abs((P.x - A.x) * dy - (P.y - A.y) * dx) / len;
+    if (d > best){ best = d; corner = P; }
+  }
+  if (!corner || best < Math.min(w, h) * 0.06) return false;   // прямая черта — не Г
+  const s1 = { x: corner.x - A.x, y: corner.y - A.y };
+  const s2 = { x: B.x - corner.x, y: B.y - corner.y };
+  const l1 = Math.hypot(s1.x, s1.y), l2 = Math.hypot(s2.x, s2.y);
+  if (l1 < h * 0.14 || l2 < w * 0.14) return false;            // черты должны быть длинными
+  const вверх = s1.y < 0 && Math.abs(s1.y) > Math.abs(s1.x) * 1.6;
+  const вправо = s2.x > 0 && Math.abs(s2.x) > Math.abs(s2.y) * 1.6;
+  if (!вверх || !вправо) return false;
+  /* угол между чертами близок к прямому: случайная дуга не пройдёт */
+  const cos = (s1.x * s2.x + s1.y * s2.y) / (l1 * l2);
+  return Math.abs(cos) < 0.45;
+}
+
 function setPocketLock(on){
   pocketLock = !!on;
   $('kPocket').classList.toggle('on', pocketLock);
@@ -491,10 +526,36 @@ function setPocketLock(on){
   send({ op: 'poleLock', on: pocketLock });
   beep(pocketLock ? 'off' : 'on');
   navigator.vibrate && navigator.vibrate(pocketLock ? [20, 60, 20] : 20);
-  msg(pocketLock ? 'КАРМАН: экран заперт. Снять — голосом «открой карман»'
-                 : 'карман открыт', 5000);
+  msg(pocketLock ? 'КАРМАН: экран заперт. Снять — нарисуй Г (вверх, потом '
+                 + 'вправо) или голосом «открой карман»'
+                 : 'карман открыт', 6000);
   return pocketLock;
 }
+
+/* Ловим жест поверх всего, пока заперто. Слушаем на документе: панели
+   всё равно не отвечают на касания, а рисовать можно где угодно. */
+let gPts = null;
+document.addEventListener('pointerdown', e => {
+  if (!pocketLock) return;
+  gPts = [{ x: e.clientX, y: e.clientY }];
+}, true);
+document.addEventListener('pointermove', e => {
+  if (!pocketLock || !gPts) return;
+  const p = gPts[gPts.length - 1];
+  if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > 6)
+    gPts.push({ x: e.clientX, y: e.clientY });
+  if (gPts.length > 400) gPts.shift();
+}, true);
+document.addEventListener('pointerup', () => {
+  if (!pocketLock || !gPts) return;
+  const ok = gLock(gPts, window.innerWidth, window.innerHeight);
+  gPts = null;
+  if (ok){
+    navigator.vibrate && navigator.vibrate([25, 50, 25]);
+    setPocketLock(false);
+  }
+}, true);
+document.addEventListener('pointercancel', () => { gPts = null; }, true);
 
 let litePeekT = null, liteHoldT = null;
 function litePeek(){
