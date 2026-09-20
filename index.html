@@ -163,7 +163,9 @@
     border-radius:50%;font-size:15px;line-height:1;padding:0;
     bottom:calc(env(safe-area-inset-bottom,0px) + 8px);
     background:rgba(18,26,34,.82);border:1px solid rgba(232,227,216,.22);color:var(--dim)}
-  body.shtor #keys{display:none}
+  /* Шторка прячет и ВЕРХНИЕ ЧИПЫ: Александр просил, чтобы всё уходило
+     вместе. Кадр видно всегда, служебное — по требованию. */
+  body.shtor #keys, body.shtor #top{display:none}
   body.shtor #kShtor{color:var(--amber);border-color:rgba(255,180,84,.5)}
   #more{position:absolute;left:8px;right:8px;z-index:7;display:none;
     bottom:calc(env(safe-area-inset-bottom,0px) + 128px);
@@ -207,6 +209,7 @@
   <div class="chip ok" id="cEar" style="display:none">👂</div>
   <div id="vu"><i></i></div>
   <div class="chip" id="cBat">—</div>
+  <div class="chip" id="cHot" style="display:none">🌡</div>
 </div>
 
 <div id="dash">
@@ -225,6 +228,7 @@
 <div id="keys">
   <button id="ptt">◉ РАЦИЯ — держи и говори</button>
   <button class="red" id="kTwitch">▶ ЭФИР</button>
+  <button class="red" id="kMost">⇄ МОСТ</button>
   <button class="red" id="kPanic">ПАНИКА</button>
   <button id="kMic">🎤 МИК</button>
   <button id="kEar">👂 УХО</button>
@@ -257,6 +261,10 @@
 
 <div id="more">
   <div class="mgrid">
+    <!-- ЗАПИСЬ И КАЧЕСТВО ПЕРВЫМИ. Шкала покраснела — «ниже» под пальцем,
+         без лазанья в студию. Это стабильность, а не удобство. -->
+    <button data-c="kach"     data-k="once" data-a="ниже">▼<i>качество ниже</i></button>
+    <button data-c="kach"     data-k="once" data-a="выше">▲<i>качество выше</i></button>
     <button data-c="warm"     data-k="once">🔥<i>разогрев</i></button>
     <button data-c="razbor"   data-k="once">📋<i>разбор</i></button>
     <button data-c="cohost"   data-s="cohost">◆<i>соведущий</i></button>
@@ -393,10 +401,19 @@ let extOn = false, extCv = null, extStream = null, extLast = 0;
 function extEnsure(){
   if (!extCv){
     extCv = document.createElement('canvas');
+    /* Пока форма кадра неизвестна — ставим горизонтальный по умолчанию.
+       Первый же кадр переопределит: холст обязан взять ЕГО форму, иначе
+       вертикальная картинка очков (720×1280) растянулась бы в
+       горизонтальную и сплющилась. Найдено 09.08 живой проверкой моста. */
     extCv.width = 1280; extCv.height = 720;
   }
   return extCv;
 }
+/* поворот кадра очков: 0/90/180/270. Очки носят горизонтально, а сенсор
+   может отдавать повёрнутый буфер — какой именно, покажет первый живой
+   кадр. Выбор помнится. */
+let extRot = 0;
+try{ extRot = +(localStorage.getItem('pole-ext-rot') || 0) || 0; }catch(e){}
 async function extUse(track){
   /* подмена дорожки без разрыва связи — тем же путём, что смена камеры */
   if (call && call.peerConnection){
@@ -414,7 +431,34 @@ window.glassFrame = function (src){
   /* кадр из приложения: рисуем в холст, из него живёт дорожка */
   const cv = extEnsure(), c = cv.getContext('2d');
   const draw = img => {
-    c.drawImage(img, 0, 0, cv.width, cv.height);
+    const iw = img.naturalWidth || img.width || img.videoWidth || 0;
+    const ih = img.naturalHeight || img.height || img.videoHeight || 0;
+    if (!extStream && iw && ih){
+      /* ФОРМА ХОЛСТА — ПО ПЕРВОМУ КАДРУ, и только до создания дорожки:
+         менять размер холста на живой дорожке нельзя, она этого не
+         переживёт. При повороте на 90°/270° стороны меняются местами. */
+      const бок = (extRot === 90 || extRot === 270);
+      cv.width = бок ? ih : iw;
+      cv.height = бок ? iw : ih;
+    }
+    c.save();
+    if (extRot){
+      c.translate(cv.width / 2, cv.height / 2);
+      c.rotate(extRot * Math.PI / 180);
+      c.translate(-(extRot === 90 || extRot === 270 ? cv.height : cv.width) / 2,
+                  -(extRot === 90 || extRot === 270 ? cv.width : cv.height) / 2);
+    }
+    /* вписываем с сохранением пропорций: чужой кадр не растягиваем */
+    const пw = (extRot === 90 || extRot === 270) ? cv.height : cv.width;
+    const пh = (extRot === 90 || extRot === 270) ? cv.width : cv.height;
+    if (iw && ih){
+      const k = Math.min(пw / iw, пh / ih);
+      const w = iw * k, h = ih * k;
+      c.fillStyle = '#000';
+      c.fillRect(0, 0, пw, пh);
+      c.drawImage(img, (пw - w) / 2, (пh - h) / 2, w, h);
+    } else c.drawImage(img, 0, 0, пw, пh);
+    c.restore();
     extLast = Date.now();
     if (!extStream){
       extStream = cv.captureStream(24);
@@ -702,6 +746,7 @@ async function openCam(){
     }, { once: true });
   }catch(e){}
   poleGuard(stream);
+  hotWatch();
   vuStart();
   return stream;
 }
@@ -853,8 +898,16 @@ function vuStart(){
     vuAn = vuCtx.createAnalyser(); vuAn.fftSize = 256;
     vuCtx.createMediaStreamSource(new MediaStream(stream.getAudioTracks())).connect(vuAn);
   }catch(e){}
+}/* ВЫКЛЮЧАТЕЛЬ. Раньше его не было вовсе: всё, что заводилось, работало до
+   закрытия вкладки. Теперь каждый такт записан, и его можно погасить. */
+let таймеры = [], тактыОпис = [], geoWatch = null;
+function такт(fn, ms){
+  тактыОпис.push([fn, ms]);          // помним, чем заводили: завести заново
+  const id = setInterval(fn, ms);    // надо ровно тем же, а не по имени
+  таймеры.push(id);
+  return id;
 }
-setInterval(() => {
+такт(() => {
   if (!vuAn || lite) return;      // налегке: VU не считаем, его всё равно не видно
   const b = new Uint8Array(vuAn.fftSize);
   vuAn.getByteTimeDomainData(b);
@@ -875,7 +928,9 @@ function median3(a){
 function geoStart(){
   if (geoStart.on || !navigator.geolocation) return;
   geoStart.on = true;
-  navigator.geolocation.watchPosition(p => {
+  /* идентификатор наблюдения храним: без него clearWatch невозможен, и
+     GPS работает до конца жизни вкладки */
+  geoWatch = navigator.geolocation.watchPosition(p => {
     const c = p.coords;
     geo.ok = true; geo.acc = c.accuracy;
     if (geo.last && c.accuracy <= GPS_GOOD){
@@ -939,7 +994,7 @@ function dashDraw(){
   }
   $('dashLine').textContent = bits.join(' · ');
 }
-setInterval(dashDraw, 1000);
+такт(dashDraw, 1000);
 
 /* ---------- связь со студией ---------- */
 async function roomId(name, pass){
@@ -953,14 +1008,18 @@ function link(state, cls){
   $('cLink').className = 'chip' + (cls ? ' ' + cls : '');
 }
 const REDIAL = [2, 3, 5, 8, 13, 21, 30, 30];
+let перезвонЖдёт = false;
 function redial(){
-  if (stopping) return;
+  /* Звонок и канал могут упасть вместе — тогда два перезвона подняли бы
+     два соединения. Пускаем один. */
+  if (stopping || перезвонЖдёт) return;
   if (retry >= REDIAL.length){ link('не дозвонился', 'bad'); msg('Студия не отвечает. Она запущена?', 8000); return; }
   const w = REDIAL[retry++];
   link('перезвон ' + w + 'с', 'warn');
   try{ if (peer) peer.destroy(); }catch(e){}
   peer = null; call = null; ctrl = null;
-  setTimeout(connect, w * 1000);
+  перезвонЖдёт = true;
+  setTimeout(() => { перезвонЖдёт = false; connect(); }, w * 1000);
 }
 async function connect(){
   if (stopping) return;
@@ -974,60 +1033,11 @@ async function connect(){
        и не спрашивает разрешения заново */
     /* ЛОВУШКА, найденная 09.08 при разборе задания по очкам: если очки
        подключились ДО входа в комнату, звонок ушёл бы с камерой телефона,
-       потому что берёт Version: ImageMagick 6.9.12-98 Q16 x86_64 18038 https://legacy.imagemagick.org
-Copyright: (C) 1999 ImageMagick Studio LLC
-License: https://imagemagick.org/script/license.php
-Features: Cipher DPC Modules OpenMP(4.5) 
-Delegates (built-in): bzlib djvu fftw fontconfig freetype heic jbig jng jp2 jpeg lcms lqr ltdl lzma openexr pangocairo png raw tiff webp wmf x xml zlib
-Usage: stream-im6.q16 [options ...] input-image raw-image
-
-Image Settings:
-  -authenticate password
-                       decipher image with this password
-  -channel type        apply option to select image channels
-  -colorspace type     alternate image colorspace
-  -compress type       type of pixel compression when writing the image
-  -define format:option
-                       define one or more image format options
-  -density geometry    horizontal and vertical density of the image
-  -depth value         image depth
-  -extract geometry    extract area from image
-  -identify            identify the format and characteristics of the image
-  -interlace type      type of image interlacing scheme
-  -interpolate method  pixel color interpolation method
-  -limit type value    pixel cache resource limit
-  -map components      one or more pixel components
-  -monitor             monitor progress
-  -quantize colorspace reduce colors in this colorspace
-  -quiet               suppress all warning messages
-  -regard-warnings     pay attention to warning messages
-  -respect-parentheses settings remain in effect until parenthesis boundary
-  -sampling-factor geometry
-                       horizontal and vertical sampling factor
-  -seed value          seed a new sequence of pseudo-random numbers
-  -set attribute value set an image attribute
-  -size geometry       width and height of image
-  -storage-type type   pixel storage type
-  -synchronize         synchronize image to storage device
-  -taint               declare the image as modified
-  -transparent-color color
-                       transparent color
-  -verbose             print detailed information about the image
-  -virtual-pixel method
-                       virtual pixel access method
-
-Miscellaneous Options:
-  -debug events        display copious debugging information
-  -help                print program options
-  -list type           print a list of supported option arguments
-  -log format          format of debugging information
-  -version             print version information
-
-By default, the image format of `file' is determined by its magic
-number.  To specify a particular image format, precede the filename
-with an image format name and a colon (i.e. ps:image) or specify the
-image type as the filename suffix (i.e. image.ps).  Specify 'file' as
-'-' for standard input or output.. Отдаём то, что показываем на самом деле. */
+       потому что берёт stream.
+       (Середина этого объяснения была затёрта 2775 байтами справки
+       ImageMagick: её программа тоже называется stream, и какой-то скрипт
+       подставил вывод команды вместо слова. Восстановлено 15.09.26 по
+       уцелевшим краям — по смыслу, не дословно.) Отдаём то, что показываем на самом деле. */
     const живое = (extOn && extStream)
       ? new MediaStream(extStream.getVideoTracks()
           .concat(stream ? stream.getAudioTracks() : []))
@@ -1074,7 +1084,16 @@ image type as the filename suffix (i.e. image.ps).  Specify 'file' as
       }
       if (d.op === 'pult-view' && d.st) paint(d.st);
     });
-    ctrl.on('close', () => { if (!stopping) link('канал закрыт', 'warn'); });
+    /* КАНАЛ ДАННЫХ ТОЖЕ ПЕРЕЗВАНИВАЕТ. Раньше падение звонка вело к
+       перезвону, а падение канала — только к надписи. Получался худший
+       отказ: картинка идёт, режиссёра слышно, а пульт мёртв, и единственный
+       признак — слово мелким шрифтом. */
+    ctrl.on('close', () => {
+      if (stopping) return;
+      link('канал упал', 'bad');
+      msg('Управление отвалилось — перезваниваю', 4000);
+      redial();
+    });
   });
   peer.on('error', e => {
     if (stopping) return;
@@ -1097,6 +1116,16 @@ function beep(kind){
     if (beepCtx.state === 'suspended') beepCtx.resume();
     const t = beepCtx.currentTime, g = beepCtx.createGain(), o = beepCtx.createOscillator();
     g.connect(beepCtx.destination); o.connect(g); o.type = 'sine';
+    /* ТИК — «ушло», а не «сделано». Короче и тише обоих, чтобы палец сразу
+       знал, что нажатие принято, но не принял это за подтверждение. */
+    if (kind === 'tick'){
+      o.frequency.setValueAtTime(660, t);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.05, t + 0.008);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.055);
+      o.start(t); o.stop(t + 0.07);
+      return;
+    }
     const up = kind !== 'off';
     o.frequency.setValueAtTime(up ? 520 : 760, t);
     o.frequency.exponentialRampToValueAtTime(up ? 880 : 430, t + 0.12);
@@ -1106,11 +1135,32 @@ function beep(kind){
     o.start(t); o.stop(t + 0.19);
   }catch(e){}
 }
-function cmd(name, args){
+/* ЖДУЩИЕ ПОДТВЕРЖДЕНИЯ. Звук обязан отставать от факта, а не опережать
+   его: подсветка кнопок и так идёт от состояния студии, но в кармане и на
+   воде экран не виден, и палец верит уху. */
+let ждут = [];
+function svery(s){
+  if (!ждут.length || !s) return;
+  ждут = ждут.filter(ж => {
+    if (s[ж.поле] !== ж.значение) return true;
+    clearTimeout(ж.часы);
+    beep(ж.значение === false || ж.значение === 'off' ? 'off' : 'on');
+    return false;
+  });
+}
+function cmd(name, args, ждём){
   if (!ctrl || !ctrl.open){ msg('нет связи со студией'); beep('off'); return; }
   send({ op: 'cmd', name, args: args || [] });
-  beep(args && args[0] === false ? 'off' : 'on');
   navigator.vibrate && navigator.vibrate(20);
+  beep('tick');                      // ушло — но ещё не сделано
+  if (!ждём) return;                 // подтверждать нечем: у команды нет состояния
+  const ж = { поле: ждём.поле, значение: ждём.значение, name: name };
+  ж.часы = setTimeout(() => {
+    ждут = ждут.filter(x => x !== ж);
+    beep('off');
+    msg('студия не подтвердила: ' + name + ' — команда могла не дойти', 5000);
+  }, 2200);
+  ждут.push(ж);
 }
 function sendOrient(){
   let a = 0;
@@ -1124,19 +1174,51 @@ function sendGeo(){
          compass: tilt.head != null, tilt: Math.round(tilt.gamma),
          lat: geo.lat, lon: geo.lon, acc: geo.acc, trk: geo.trk, t: Date.now() });
 }
-setInterval(sendGeo, 2000);
-setInterval(sendOrient, 15000);
+такт(sendGeo, 2000);
+такт(sendOrient, 15000);
 window.addEventListener('orientationchange', () => setTimeout(sendOrient, 350));
+
+/* ПОГАСИТЬ ВСЁ. Зовётся при уходе по кнопке и при закрытии страницы.
+   Дорожки камеры не трогаем нарочно: вход обратно берёт их как есть, а
+   лишний перезахват на айфоне стоит секунды и может не дать разрешения. */
+function poleStop(){
+  таймеры.forEach(clearInterval); таймеры = [];
+  try{ if (hotT) clearInterval(hotT); }catch(e){}
+  hotT = null;
+  if (geoWatch != null){
+    try{ navigator.geolocation.clearWatch(geoWatch); }catch(e){}
+    geoWatch = null;
+  }
+  geoStart.on = false;
+  try{ if (wake){ wake.release(); wake = null; } }catch(e){}
+}
+/* Завести заново — вход в комнату зовёт это после погашения. */
+function poleStart(){
+  if (таймеры.length) return;
+  тактыОпис.forEach(о => таймеры.push(setInterval(о[0], о[1])));
+}
+window.addEventListener('pagehide', poleStop);
 
 /* ---------- кнопки состояния студии ---------- */
 function paint(s){
   st = s || {};
+  svery(st);                         // пришло состояние — гасим ждущих
   const set = (id, on, cls) => {
     const b = $(id);
     b.classList.toggle('on', !!on);
     if (cls) b.classList.toggle(cls, !!on);
   };
   set('kTwitch', st.twitch); set('kPanic', st.panic);
+  set('kMost', st.most);
+  /* Очередь моста — единственное, что на нём может испортиться, и растёт
+     она молча. На пульте это вторая строка кнопки: пока пусто — тишина,
+     начала копиться — видно сразу, не дожидаясь обрыва. */
+  {
+    const м = $('kMost');
+    if (м) м.textContent = st.most
+      ? ('⇄ В ЭФИРЕ' + (st.mostOchered > 0.5 ? ' · ' + st.mostOchered + ' МБ' : ''))
+      : '⇄ МОСТ';
+  }
   if (st.istok) document.querySelectorAll('#istok button')
     .forEach(b => b.classList.toggle('on', b.dataset.i === st.istok));
   document.querySelectorAll('.mgrid button[data-s]').forEach(b => {
@@ -1144,6 +1226,14 @@ function paint(s){
     b.classList.toggle('on', b.dataset.on ? (v === b.dataset.on) : !!v);
   });
   if (st.hero !== undefined && st.hero !== heroNow){ heroNow = st.hero; camsWas = ''; }
+  /* нагрев СТУДИИ (она может быть на другом телефоне): показываем рядом
+     со своим — свой чип меряет камеру этого устройства */
+  if (st.tempLvl !== undefined && st.tempLvl > 0){
+    const ч = $('cHot');
+    ч.style.display = '';
+    ч.textContent = '🌡 студия ' + st.temp + ' к/с';
+    ч.className = 'chip ' + (st.tempLvl > 1 ? 'bad' : 'warn');
+  }
   camsPaint(st.camList);
   set('kBlur', st.blur); set('kDash', st.dash);
   $('cLink').textContent = st.twitch ? 'В ЭФИРЕ' : 'в эфире';
@@ -1167,6 +1257,65 @@ document.addEventListener('visibilitychange', () => {
     }
   }, 700);
 });
+/* СЕТЬ ПРОПАЛА И ВЕРНУЛАСЬ. На воде это обычное дело — телефон ныряет в
+   тень или переходит с вышки на вышку. Раньше поле молчало и просто
+   теряло связь; теперь говорит и поднимается само. */
+window.addEventListener('offline', () => {
+  link('сеть пропала', 'bad');
+  msg('Сеть пропала. Вернётся — подключусь сам, ничего не нажимай.', 6000);
+});
+window.addEventListener('online', () => {
+  link('сеть вернулась', 'warn');
+  setTimeout(() => {
+    if (stopping || !target) return;
+    if (!call || !peer || peer.disconnected || peer.destroyed){
+      retry = 0;
+      connect();
+    }
+  }, 1500);
+});
+
+/* НАГРЕВ ТЕЛЕФОНА — косвенно, потому что прямо нельзя.
+   Датчика температуры браузеру не дают ни Safari, ни Chrome: такого API
+   просто нет. Врать градусами не будем.
+   Но нагрев виден по делу: когда телефону жарко, система сама сбавляет
+   ему частоту, и кадры начинают приходить реже заявленных. Это и
+   показываем — не «45 градусов», а «камера просела до 18 к/с».
+   Меряем по кадрам своей же камеры, раз в 4 секунды. */
+let hotFps = 0, hotWas = 0, hotCount = 0, hotT = null;
+function hotWatch(){
+  const v = $('cam');
+  if (!v) return;
+  /* Камера открывается заново при смене устройства, повороте, возврате
+     после обрыва — а таймер тут вечный. Без этой проверки за эфир их
+     накопился бы десяток, и каждый считал бы своё. */
+  if (hotT) return;
+  const счётчик = () => {
+    hotCount++;
+    if (v.requestVideoFrameCallback) v.requestVideoFrameCallback(счётчик);
+  };
+  if (v.requestVideoFrameCallback) v.requestVideoFrameCallback(счётчик);
+  /* НЕ в общий список таймеров: poleStart проверяет его на пустоту и
+     иначе не завёл бы такты вовсе. Этот гасится отдельно в poleStop —
+     он там уже учтён. */
+  hotT = setInterval(() => {
+    if (!v.requestVideoFrameCallback) return;
+    const now = Date.now();
+    if (hotWas){
+      hotFps = Math.round(hotCount * 1000 / (now - hotWas));
+      const ч = $('cHot');
+      if (hotFps > 0 && hotFps < 20){
+        ч.style.display = '';
+        ч.textContent = '🌡 ' + hotFps + ' к/с';
+        ч.className = 'chip ' + (hotFps < 12 ? 'bad' : 'warn');
+      } else {
+        ч.style.display = 'none';
+      }
+    }
+    hotWas = now; hotCount = 0;
+  }, 4000);
+}
+
 async function battery(){
   try{
     if (!navigator.getBattery) return;
@@ -1197,15 +1346,40 @@ $('ptt').addEventListener('pointercancel', () => ptt(false));
 /* ---------- кнопки ---------- */
 $('kTwitch').onclick = () => {
   /* просим студию: она сама возьмёт сохранённый ключ и источник */
-  cmd('twitch', [!st.twitch]);
+  cmd('twitch', [!st.twitch], { поле: 'twitch', значение: !st.twitch });
   msg(st.twitch ? 'останавливаю эфир…' : 'запускаю эфир на студии…', 4000);
 };
-$('kPanic').onclick = () => cmd('panic', [!st.panic]);
-$('kBlur').onclick = () => cmd('blur', [!st.blur]);
+$('kMost').onclick = () => {
+  /* адрес и режим живут в студии — пульт только поворачивает рубильник */
+  cmd('most', [!st.most], { поле: 'most', значение: !st.most });
+  msg(st.most ? 'останавливаю мост…' : 'вывожу через мост…', 4000);
+};
+$('kPanic').onclick = () => cmd('panic', [!st.panic], { поле: 'panic', значение: !st.panic });
+$('kBlur').onclick = () => cmd('blur', [!st.blur], { поле: 'blur', значение: !st.blur });
 /* Пульт студии: двенадцать клавиш компактной сеткой. Дистанционно, потому
    что до ноутбука с воды не дотянуться. Подсветка идёт от СОСТОЯНИЯ студии,
    а не от нажатия: если команда не дошла, кнопка не соврёт. */
+/* ПОВОРОТ КАДРА ОЧКОВ — долгим нажатием на 🕶 ОЧКИ. Кнопку не добавляем:
+   ряд и так плотный, а поворот нужен один раз при настройке. */
+let extRotT = null;
+$('kExt').addEventListener('pointerdown', () => {
+  clearTimeout(extRotT);
+  extRotT = setTimeout(() => {
+    extRotT = 'done';
+    extRot = (extRot + 90) % 360;
+    try{ localStorage.setItem('pole-ext-rot', String(extRot)); }catch(e){}
+    /* дорожку пересоздаём: форма холста меняется, а на живой её не сменить */
+    extStream = null;
+    msg('поворот кадра очков: ' + extRot + '° — следующий кадр встанет так', 4000);
+    beep('on');
+  }, 600);
+});
+$('kExt').addEventListener('pointerup', () => {
+  if (extRotT === 'done'){ extRotT = null; return; }
+  clearTimeout(extRotT);
+});
 $('kExt').onclick = () => {
+  if (extRotT === 'done'){ extRotT = null; return; }   // это был поворот
   if (extOn){ extOff(); return; }
   if (!extStream){
     msg('очки не подключены: нужна обёртка Meta Wearables на этом телефоне — '
@@ -1351,8 +1525,11 @@ document.querySelectorAll('.mgrid button').forEach(b => {
     const c = b.dataset.c;
     if (b.dataset.k === 'once'){
       const ARG = { mark: ['метка из поля'], udar: [1], zachet: [''], beseda: [true] };
-      cmd(c, ARG[c] || []);
-      msg({ razbor: 'прошу разбор эфира', warm: 'прошу разогрев у Клода',
+      /* data-a — готовый аргумент прямо в разметке: так «ниже» и «выше»
+         обходятся без второй таблицы в коде. */
+      cmd(c, b.dataset.a ? [b.dataset.a] : (ARG[c] || []));
+      msg({ kach: b.dataset.a === 'ниже' ? 'ступень качества вниз' : 'ступень качества вверх',
+            razbor: 'прошу разбор эфира', warm: 'прошу разогрев у Клода',
             probeNext: 'переключаю, чьи приборы в кадре', udar: 'удар в эфир',
             zachet: 'зачёт последнему совету', beseda: 'зову собеседника',
             frame: 'кадр ушёл Клоду', mark: 'метка поставлена' }[c] || 'сделано', 3000);
@@ -1361,7 +1538,7 @@ document.querySelectorAll('.mgrid button').forEach(b => {
     const cur = st[b.dataset.s];
     const isOn = b.dataset.on ? (cur === b.dataset.on) : !!cur;
     const next = b.dataset.on ? (isOn ? b.dataset.off : b.dataset.on) : !isOn;
-    cmd(c, [next]);
+    cmd(c, [next], { поле: b.dataset.s, значение: next });
   };
 });
 
@@ -1449,7 +1626,7 @@ $('kProg').onclick = () => progShow('prog', !(progOn && progKind === 'prog'));
    экран. Выбор здесь, потому что на воде до ноутбука не дотянуться. */
 document.querySelectorAll('#istok button').forEach(b => {
   b.onclick = () => {
-    cmd('istok', [b.dataset.i]);
+    cmd('istok', [b.dataset.i], { поле: 'istok', значение: b.dataset.i });
     document.querySelectorAll('#istok button')
       .forEach(x => x.classList.toggle('on', x === b));
     msg(b.dataset.i === 'canvas' ? 'в эфир пойдёт собранный кадр студии'
@@ -1470,7 +1647,9 @@ $('kOff').onclick = () => {
   try{ if (ctrl && ctrl.open) ctrl.send({ op: 'bye' }); }catch(e){}
   try{ if (call) call.close(); }catch(e){}
   try{ if (peer) peer.destroy(); }catch(e){}
+  poleStop();                 // не только связь: GPS, такты, удержание экрана
   link('отключено');
+  msg('Всё погашено: GPS, приборы, отправка. Батарея целее.', 5000);
   $('enter').style.display = 'flex';
   stopping = false;
 };
@@ -1498,10 +1677,30 @@ $('eGo').onclick = async () => {
   memSave({ name: myName, code: ($('eCode').value || '').trim(), room: rn, facing,
             pass: rp ? '1' : '', t: Date.now() });
   try{ await openCam(); }
-  catch(e){ msg('камера не открылась: ' + (e.name || e), 8000); return; }
+  catch(e){
+    /* Первое, что видит человек, если что-то не так. Имя ошибки ему
+       ничего не говорит — называем причину и следующий шаг, как в студии. */
+    const имя = (e && e.name) || '';
+    let что;
+    if (имя === 'NotAllowedError' || имя === 'SecurityError'){
+      что = 'Камера запрещена. Настройки → Safari → Камера → Разрешить, '
+          + 'потом обнови страницу.';
+    } else if (имя === 'NotReadableError'){
+      что = 'Камеру держит другое приложение — закрой его и попробуй снова.';
+    } else if (имя === 'NotFoundError'){
+      что = 'Камера не найдена на этом устройстве.';
+    } else if (location.protocol !== 'https:' && location.hostname !== 'localhost'){
+      что = 'Страница не по HTTPS — браузер не даст камеру.';
+    } else {
+      что = 'Камера не открылась (' + (имя || 'без имени') + ').';
+    }
+    msg(что, 12000);
+    return;
+  }
   battery();
   $('enter').style.display = 'none';
   stopping = false; retry = 0;
+  poleStart();                // после ухода такты были погашены — заводим
   connect();
 };
 
